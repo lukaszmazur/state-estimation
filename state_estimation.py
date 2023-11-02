@@ -20,14 +20,14 @@ class Plotter():
         gt_y = [location[2][1] for location in gt_data]
         gt_z = [location[2][2] for location in gt_data]
 
-        # logging.info(f'gnss: {gnss_data[-1][1]}')
-        gnss_x = [x[1].x for x in gnss_data]
-        gnss_y = [x[1].y for x in gnss_data]
-        gnss_z = [x[1].z for x in gnss_data]
+        logging.info(f'gnss: {gnss_data}')
+        # gnss_x = [x[1].x for x in gnss_data]
+        # gnss_y = [x[1].y for x in gnss_data]
+        # gnss_z = [x[1].z for x in gnss_data]
 
         est_traj_fig = plt.figure(figsize=(18, 12))
         ax = est_traj_fig.add_subplot(111, projection='3d')
-        ax.plot(gnss_x, gnss_y, gnss_z, label='GNSS')
+        ax.plot(gnss_data[:, 0], gnss_data[:, 1], gnss_data[:, 2], label='GNSS')
         ax.plot(gt_x, gt_y, gt_z, label='Ground Truth')
         ax.set_xlabel('Easting [m]')
         ax.set_ylabel('Northing [m]')
@@ -120,6 +120,37 @@ class Geo2Location(object):
         """ Get the 4-by-4 transform matrix """
         return self._tform
 
+class GnssDataBuffer():
+    """
+    Class storing GNSS data from measurements and transforming GeoLocation to Location.
+    """
+    def __init__(self, carla_map):
+        self.BUFFER_SIZE = 1000
+        # storing just x, y, z location after transformation for each measurement
+        self._data = np.zeros((self.BUFFER_SIZE, 3))
+        self._number_of_elements_in_buffer = 0
+        self._geo2location = Geo2Location(carla_map)
+
+    def on_measurement(self, gnss_data):
+        location = self._geo2location.transform(
+                carla.GeoLocation(gnss_data.latitude, gnss_data.longitude, gnss_data.altitude))
+        logging.debug(f'GnssDataBuffer: received GNSS measurement with location {location}')
+        location_array = np.array([location.x, location.y, location.z])
+        if (self._number_of_elements_in_buffer < self.BUFFER_SIZE):
+            # logging.debug('GnssDataBuffer: buffer not yet full, adding elements inside')
+            self._data[self._number_of_elements_in_buffer, :] = location_array
+            self._number_of_elements_in_buffer += 1
+        else:
+            # logging.debug('GnssDataBuffer: buffer full, rolling elements')
+            # TODO: check for more efficient options
+            self._data = np.roll(self._data, -1, axis=0)
+            self._data[-1, :] = location_array
+        logging.debug(f'GnssDataBuffer: elements in buffer: {self._number_of_elements_in_buffer}')
+        logging.debug(f'GnssDataBuffer: data: \n{self._data}')
+
+    def get_data(self):
+        return self._data[:self._number_of_elements_in_buffer]
+
 
 def main():
 
@@ -202,16 +233,10 @@ def main():
         gnss_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
         gnss = world.spawn_actor(gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
         print('created %s' % gnss.type_id)
-        geo2location = Geo2Location(world.get_map())
-        
-        gnss_measurements = []
-        def on_gnss_measurement(data):
-            location = geo2location.transform(
-                carla.GeoLocation(data.latitude, data.longitude, data.altitude))
-            gnss_measurements.append((data, location))
-        gnss.listen(on_gnss_measurement)
+        gnssDataBuffer = GnssDataBuffer(world.get_map())
+        gnss.listen(lambda data: gnssDataBuffer.on_measurement(data))
 
-        simulation_timeout_seconds = 10
+        simulation_timeout_seconds = 30
         timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
         logging.info(f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
@@ -219,7 +244,7 @@ def main():
             world.wait_for_tick()
 
         logging.info('plotting results')
-        Plotter.plot_ground_truth_and_gnss(ego_vehicle_snapshots, gnss_measurements)
+        Plotter.plot_ground_truth_and_gnss(ego_vehicle_snapshots, gnssDataBuffer.get_data())
 
     finally:
         logging.info('destroying actors')
