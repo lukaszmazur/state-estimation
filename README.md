@@ -8,6 +8,7 @@ Dependencies for examples (`/opt/carla-simulator/PythonAPI/examples/requirements
 
 
 # TODOs
+- offline plot after fixed time of simulation
 - plot ground truth location of ego vehicle
 - plot sensor measurements:
     - IMU
