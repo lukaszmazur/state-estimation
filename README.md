@@ -8,10 +8,10 @@ Dependencies for examples (`/opt/carla-simulator/PythonAPI/examples/requirements
 
 
 # TODOs
-- offline plot after fixed time of simulation
-- plot ground truth location of ego vehicle
-- plot sensor measurements:
-    - IMU
-    - GNSS
+- extend buffered data with timestamp/frame
+- transform measurement data to fit state estimation
+- add state estimation algorithm
 - plot state estimation
-- add ring buffer for stored measurement/ground truth
+- add measurement noises
+- change sensor location relative to ego vehicle
+- add LIDAR with transformation to get localization
