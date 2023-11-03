@@ -16,10 +16,8 @@ class Plotter():
 
     @staticmethod
     def plot_ground_truth_and_gnss(gt_data, gnss_data):
-
-        logging.info(f'gt: \n{gt_data}')
-        logging.info(f'gnss: \n{gnss_data}')
-
+        # logging.info(f'gt: \n{gt_data}')
+        # logging.info(f'gnss: \n{gnss_data}')
         est_traj_fig = plt.figure(figsize=(18, 12))
         ax = est_traj_fig.add_subplot(111, projection='3d')
         ax.plot(gnss_data[:, 0], gnss_data[:, 1], gnss_data[:, 2], label='GNSS')
@@ -27,16 +25,33 @@ class Plotter():
         ax.set_xlabel('Easting [m]')
         ax.set_ylabel('Northing [m]')
         ax.set_zlabel('Up [m]')
-        # ax.set_title('Ground Truth and Estimated Trajectory')
-        ax.set_title('Ground Truth')
-        # ax.set_xlim(0, 200)
-        # ax.set_ylim(0, 200)
-        # ax.set_zlim(-2, 2)
-        # ax.set_xticks([0, 50, 100, 150, 200])
-        # ax.set_yticks([0, 50, 100, 150, 200])
-        # ax.set_zticks([-2, -1, 0, 1, 2])
+        ax.set_title('Ground Truth and GNSS')
         ax.legend(loc=(0.62,0.77))
         ax.view_init(elev=45, azim=-50)
+        plt.show()
+
+    @staticmethod
+    def plot_imu_data(imu_data):
+        logging.info(f'imu: \n{imu_data}')
+        imu_data_fig = plt.figure(figsize=(36, 12))
+        ax_a_x = imu_data_fig.add_subplot(231)
+        ax_a_x.plot(imu_data[:, 0])
+        ax_a_x.set_title('Acceleration x-axis')
+        ax_a_y = imu_data_fig.add_subplot(232)
+        ax_a_y.plot(imu_data[:, 1])
+        ax_a_y.set_title('Acceleration y-axis')
+        ax_a_z = imu_data_fig.add_subplot(233)
+        ax_a_z.plot(imu_data[:, 2])
+        ax_a_z.set_title('Acceleration z-axis')
+        ax_w_x = imu_data_fig.add_subplot(234)
+        ax_w_x.plot(imu_data[:, 3])
+        ax_w_x.set_title('Angular velocity x-axis')
+        ax_w_y = imu_data_fig.add_subplot(235)
+        ax_w_y.plot(imu_data[:, 4])
+        ax_w_y.set_title('Angular velocity y-axis')
+        ax_w_z = imu_data_fig.add_subplot(236)
+        ax_w_z.plot(imu_data[:, 5])
+        ax_w_z.set_title('Angular velocity z-axis')
         plt.show()
 
     @staticmethod
@@ -148,10 +163,28 @@ class GnssDataBuffer(RingBuffer):
         location = self._geo2location.transform(
                 carla.GeoLocation(gnss_data.latitude, gnss_data.longitude, gnss_data.altitude))
         logging.debug(f'GnssDataBuffer: received GNSS measurement with location {location}')
-        location_array = np.array([location.x, location.y, location.z])
-        self.insert_element(location_array)
+        data_array = np.array([location.x, location.y, location.z])
+        self.insert_element(data_array)
         logging.debug(f'GnssDataBuffer: elements in buffer: {self._number_of_elements_in_buffer}')
         logging.debug(f'GnssDataBuffer: data: \n{self._data}')
+
+class ImuDataBuffer(RingBuffer):
+    """
+    Class storing IMU data from measurements.
+    """
+    def __init__(self):
+        # storing acceleration (3d) and angular velocity (3d)
+        super().__init__(element_size=6, buffer_size=1000)
+
+    def on_measurement(self, imu_data):
+        logging.debug(f'ImuDataBuffer: received IMU measurement with data {imu_data}')
+        data_array = np.array([
+            imu_data.accelerometer.x, imu_data.accelerometer.y, imu_data.accelerometer.z,
+            imu_data.gyroscope.x, imu_data.gyroscope.y, imu_data.gyroscope.z
+            ])
+        self.insert_element(data_array)
+        logging.debug(f'ImuDataBuffer: elements in buffer: {self._number_of_elements_in_buffer}')
+        logging.debug(f'ImuDataBuffer: data: \n{self._data}')
 
 class GroundTruthBuffer(RingBuffer):
     """
@@ -182,7 +215,7 @@ class GroundTruthBuffer(RingBuffer):
 
 def main():
 
-    logging.basicConfig(format='%(levelname)s: %(funcName)s: %(message)s', level=logging.DEBUG)
+    logging.basicConfig(format='%(levelname)s: %(funcName)s: %(message)s', level=logging.INFO)
 
     client = carla.Client('localhost', 2000)
     client.set_timeout(10.0)
@@ -220,36 +253,28 @@ def main():
         # enable autopilot for ego vehicle
         ego_vehicle.set_autopilot(True)
 
-        # # vehicle_locations = []
+        # create IMU sensor
+        imu_bp = blueprint_library.find('sensor.other.imu')
+        imu_bp.set_attribute('sensor_tick', '0.1')
+        # TODO: check relative location
+        imu_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
+        imu = world.spawn_actor(imu_bp, imu_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
+        logging.info('created %s' % imu.type_id)
+        imu_data_buffer = ImuDataBuffer()
+        imu.listen(lambda data: imu_data_buffer.on_measurement(data))
 
-        # imu_bp = blueprint_library.find('sensor.other.imu')
-        # imu_bp.set_attribute('sensor_tick', '0.1')
-        # # TODO: check relative location
-        # imu_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
-        # imu = world.spawn_actor(imu_bp, imu_transform, attach_to=ego_vehicle)
-        # actor_list.append(imu)
-        # print('created %s' % imu.type_id)
-        # imu_measurements = []
-
-        # def imu_callback(measurement):
-        #     imu_measurements.append(measurement)
-        #     # snapshot = world.get_snapshot()
-        #     # vehicle_locations.append((snapshot.frame, snapshot.timestamp.elapsed_seconds,
-        #     #                           vehicle.get_location(), vehicle.get_velocity(), vehicle.get_acceleration()))
-        #     # print(f'IMU measurement: {measurement} \nvehicle location: {vehicle_locations[-1]}\n')
-
-        # imu.listen(imu_callback)
-
+        # create GNSS sensor
         gnss_bp = blueprint_library.find('sensor.other.gnss')
         gnss_bp.set_attribute('sensor_tick', '1.0')
         # TODO: check relative location
         gnss_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
         gnss = world.spawn_actor(gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
-        print('created %s' % gnss.type_id)
+        logging.info('created %s' % gnss.type_id)
         gnss_data_buffer = GnssDataBuffer(world.get_map())
         gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
 
-        simulation_timeout_seconds = 30
+        # wait for some time to collect data
+        simulation_timeout_seconds = 10
         timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
         logging.info(f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
@@ -258,10 +283,12 @@ def main():
 
         logging.info('plotting results')
         Plotter.plot_ground_truth_and_gnss(gt_buffer.get_data(), gnss_data_buffer.get_data())
+        Plotter.plot_imu_data(imu_data_buffer.get_data())
 
     finally:
         logging.info('destroying actors')
-        # imu.destroy()
+        imu.stop()
+        imu.destroy()
         gnss.stop()
         gnss.destroy()
         ego_vehicle.destroy()
