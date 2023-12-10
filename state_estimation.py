@@ -169,15 +169,15 @@ class GnssDataBuffer(RingBuffer):
     Class storing GNSS data from measurements and transforming GeoLocation to Location.
     """
     def __init__(self, carla_map):
-        # storing just x, y, z location after transformation for each measurement
-        super().__init__(element_size=3, buffer_size=1000)
+        # storing just x, y, z location after transformation for each measurement + timestamp
+        super().__init__(element_size=4, buffer_size=1000)
         self._geo2location = Geo2Location(carla_map)
 
     def on_measurement(self, gnss_data):
         location = self._geo2location.transform(
                 carla.GeoLocation(gnss_data.latitude, gnss_data.longitude, gnss_data.altitude))
         logging.debug(f'GnssDataBuffer: received GNSS measurement with location {location}')
-        data_array = np.array([location.x, location.y, location.z])
+        data_array = np.array([location.x, location.y, location.z, gnss_data.timestamp])
         self.insert_element(data_array)
         logging.debug(f'GnssDataBuffer: elements in buffer: {self._number_of_elements_in_buffer}')
         logging.debug(f'GnssDataBuffer: data: \n{self._data}')
@@ -418,9 +418,10 @@ class EsEkfSolver():
         orientation = last_gt_snapshot[3:6]
         return location, velocity, orientation
     
-    def _measurement_update(sensor_var, p_cov_check, y_k, p_check, v_check, q_check, h_jac):
+    def _measurement_update(self, sensor_var, p_cov_check, y_k, p_check, v_check, q_check, h_jac):
         # 3.1 Compute Kalman Gain
         r_cov = np.eye(3) * (sensor_var**2)  # SOLUTION: sensor var is not squared
+        logging.info(f'p_cov_check={p_cov_check}, h_jac={h_jac}, r_cov={r_cov}')
         k_gain = p_cov_check @ h_jac.T @ np.linalg.inv(h_jac @ p_cov_check @ h_jac.T + r_cov)  # 9x3
 
         # 3.2 Compute error state
@@ -437,13 +438,13 @@ class EsEkfSolver():
         return p_hat, v_hat, q_hat, p_cov_hat
 
     # def on_data_change(self, data):
-    def process_data(self, imu_data, gt_data):
+    def process_data(self, imu_data, gnss_data, gt_data):
         logging.info(f'imu_data.shape={imu_data.shape}')
+        logging.info(f'gnss_data.shape={gnss_data.shape}')
 
-        var_imu_f = 0.10 # 0.10
-        var_imu_w = 0.25 # 0.25
-        var_gnss  = 0.15 # 0.01
-        var_lidar = 0.80 # 1.00
+        var_imu_f = 0.01 # 0.10
+        var_imu_w = 0.01 # 0.25
+        var_gnss  = 0.01 # 0.01
 
         g = np.array([0, 0, -9.81])  # gravity
         l_jac = np.zeros([9, 6])
@@ -474,6 +475,9 @@ class EsEkfSolver():
         imu_w = imu_data[:, 3:6]
         imu_t = imu_data[:, 6]
 
+        gnss = gnss_data[:, :3]
+        gnss_t = gnss_data[:, 3]
+
         logging.info(f'imu_f={imu_f[:3]}, imu_w={imu_w[:3]}, imu_t={imu_t[:3]}')
 
         for k in range(1, imu_t.shape[0]):  # start at 1 b/c we have initial prediction from gt
@@ -501,11 +505,11 @@ class EsEkfSolver():
 
             # 3. Check availability of GNSS and LIDAR measurements
 
-            # if gnss_i < gnss.t.size and gnss.t[gnss_i] <= imu_f.t[k]:
-            #     # print(f"GNSS measurement available at timestep {gnss.t[gnss_i]} (IMU timestep {imu_f.t[k]})")
-            #     p_check, v_check, q_check, p_cov_check = _measurement_update(
-            #         var_gnss, p_cov_check, gnss.data[gnss_i], p_check, v_check, q_check)
-            #     gnss_i += 1
+            if gnss_i < gnss_t.shape[0] and gnss_t[gnss_i] <= imu_t[k]:
+                logging.info(f"GNSS measurement available at timestep {gnss_t[gnss_i]} (IMU timestep {imu_t[k]})")
+                p_check, v_check, q_check, p_cov_check = self._measurement_update(
+                    var_gnss, p_cov_check, gnss[gnss_i], p_check, v_check, q_check, h_jac)
+                gnss_i += 1
 
             # Update states (save)
 
@@ -515,7 +519,6 @@ class EsEkfSolver():
             p_cov[k] = p_cov_check
 
         return p_est, v_est, q_est, p_cov
-
 
 
 def main():
@@ -607,8 +610,9 @@ def main():
         # offline processing of Kalman filter
         # remove first few measurements, just after sensor creation (spikes)
         collected_imu_data = imu_data_buffer.get_data()[5:]
+        collected_gnss_data = gnss_data_buffer.get_data()[5:]
         collected_gt_data = gt_buffer.get_data()[5:]
-        p_est, v_est, q_est, p_cov = es_ekf.process_data(collected_imu_data, collected_gt_data)
+        p_est, v_est, q_est, p_cov = es_ekf.process_data(collected_imu_data, collected_gnss_data, collected_gt_data)
 
         logging.info('plotting results')
         Plotter.plot_ground_truth_and_estimated(collected_gt_data, p_est)
