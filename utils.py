@@ -77,7 +77,8 @@ class Quaternion():
             # self.z = cr * cp * sy + sr * sp * cy
 
     def __repr__(self):
-        return "Quaternion (wxyz): [%2.5f, %2.5f, %2.5f, %2.5f]" % (self.w, self.x, self.y, self.z)
+        # return "Quaternion (wxyz): [%2.5f, %2.5f, %2.5f, %2.5f]" % (self.w, self.x, self.y, self.z)
+        return "Quaternion (xyzw): [%2.5f, %2.5f, %2.5f, %2.5f]" % (self.x, self.y, self.z, self.w)
 
     def to_axis_angle(self):
         t = 2*np.arccos(self.w)
