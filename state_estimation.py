@@ -194,7 +194,7 @@ class ImuDataBuffer(RingBuffer):
         super().__init__(element_size=7, buffer_size=1000)
 
     def on_measurement(self, imu_data):
-        logging.debug(f'ImuDataBuffer: received IMU measurement with data {imu_data}')
+        logging.info(f'ImuDataBuffer: received IMU measurement with data {imu_data}, transform: {imu_data.transform}')
         data_array = np.array([
             imu_data.accelerometer.x, imu_data.accelerometer.y, imu_data.accelerometer.z,
             imu_data.gyroscope.x, imu_data.gyroscope.y, imu_data.gyroscope.z,
@@ -384,7 +384,8 @@ class EsEkfSolver():
 
 def main():
 
-    logging.basicConfig(format='%(levelname)s: %(funcName)s: %(message)s', level=logging.INFO)
+    logging.basicConfig(format='%(levelname)s: %(funcName)s: %(message)s', level=logging.INFO,
+                        filename="output_imu_data_06.log")
 
     client = carla.Client('localhost', 2000)
     client.set_timeout(10.0)
@@ -451,15 +452,15 @@ def main():
         imu.listen(lambda data: imu_data_buffer.on_measurement(data))
         # imu.listen(lambda data: on_imu_measurement(data))
 
-        # create GNSS sensor
-        gnss_bp = blueprint_library.find('sensor.other.gnss')
-        gnss_bp.set_attribute('sensor_tick', '1.0')
-        # TODO: check relative location
-        gnss_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
-        gnss = world.spawn_actor(gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
-        logging.info('created %s' % gnss.type_id)
-        gnss_data_buffer = GnssDataBuffer(world.get_map())
-        gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
+        # # create GNSS sensor
+        # gnss_bp = blueprint_library.find('sensor.other.gnss')
+        # gnss_bp.set_attribute('sensor_tick', '1.0')
+        # # TODO: check relative location
+        # gnss_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
+        # gnss = world.spawn_actor(gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
+        # logging.info('created %s' % gnss.type_id)
+        # gnss_data_buffer = GnssDataBuffer(world.get_map())
+        # gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
 
         # wait for some time to collect data
         simulation_timeout_seconds = 10
@@ -469,44 +470,44 @@ def main():
         for _ in range(timeout_ticks):
             world.wait_for_tick()
 
-        # offline processing of Kalman filter
-        # remove first few measurements, just after sensor creation (spikes)
-        collected_imu_data = imu_data_buffer.get_data()[5:]
-        collected_gnss_data = gnss_data_buffer.get_data()[5:]
-        collected_gt_data = gt_buffer.get_data()[5:]
-        p_est, v_est, q_est, p_cov, gt_values = es_ekf.process_data(collected_imu_data, collected_gnss_data, collected_gt_data)
+        # # offline processing of Kalman filter
+        # # remove first few measurements, just after sensor creation (spikes)
+        # collected_imu_data = imu_data_buffer.get_data()[5:]
+        # collected_gnss_data = gnss_data_buffer.get_data()[5:]
+        # collected_gt_data = gt_buffer.get_data()[5:]
+        # p_est, v_est, q_est, p_cov, gt_values = es_ekf.process_data(collected_imu_data, collected_gnss_data, collected_gt_data)
 
-        gt_p0, gt_v0, gt_r0 = gt_values
-        gt_location0 = carla.Location(x=gt_p0[0], y=gt_p0[1], z=gt_p0[2])
-        gt_rotation0 = carla.Rotation(roll=gt_r0[0], pitch=gt_r0[1], yaw=gt_r0[2])
+        # gt_p0, gt_v0, gt_r0 = gt_values
+        # gt_location0 = carla.Location(x=gt_p0[0], y=gt_p0[1], z=gt_p0[2])
+        # gt_rotation0 = carla.Rotation(roll=gt_r0[0], pitch=gt_r0[1], yaw=gt_r0[2])
         
-        logging.info(f"gt_rotation0={gt_rotation0}")
+        # logging.info(f"gt_rotation0={gt_rotation0}")
 
-        z_offset = 4
-        arrow_length = 3
-        red = carla.Color(255,0,0,0)
-        green = carla.Color(0,255,0,0)
-        blue = carla.Color(0,0,255,0)
-        xyz_begin = carla.Location(x=gt_p0[0], y=gt_p0[1], z=gt_p0[2]+z_offset)
-        x_end = carla.Location(x=gt_p0[0]+arrow_length, y=gt_p0[1], z=gt_p0[2]+z_offset)
-        debug.draw_arrow(xyz_begin, x_end, color=red, life_time=0)
-        y_end = carla.Location(x=gt_p0[0], y=gt_p0[1]+arrow_length, z=gt_p0[2]+z_offset)
-        debug.draw_arrow(xyz_begin, y_end, color=green, life_time=0)
-        z_end = carla.Location(x=gt_p0[0], y=gt_p0[1], z=gt_p0[2]+z_offset+arrow_length)
-        debug.draw_arrow(xyz_begin, z_end, color=blue, life_time=0)
-        debug.draw_box(carla.BoundingBox(gt_location0, carla.Vector3D(3, 2, 1)), gt_rotation0, 0.05, carla.Color(255,0,0,0), 0)
+        # z_offset = 4
+        # arrow_length = 3
+        # red = carla.Color(255,0,0,0)
+        # green = carla.Color(0,255,0,0)
+        # blue = carla.Color(0,0,255,0)
+        # xyz_begin = carla.Location(x=gt_p0[0], y=gt_p0[1], z=gt_p0[2]+z_offset)
+        # x_end = carla.Location(x=gt_p0[0]+arrow_length, y=gt_p0[1], z=gt_p0[2]+z_offset)
+        # debug.draw_arrow(xyz_begin, x_end, color=red, life_time=0)
+        # y_end = carla.Location(x=gt_p0[0], y=gt_p0[1]+arrow_length, z=gt_p0[2]+z_offset)
+        # debug.draw_arrow(xyz_begin, y_end, color=green, life_time=0)
+        # z_end = carla.Location(x=gt_p0[0], y=gt_p0[1], z=gt_p0[2]+z_offset+arrow_length)
+        # debug.draw_arrow(xyz_begin, z_end, color=blue, life_time=0)
+        # debug.draw_box(carla.BoundingBox(gt_location0, carla.Vector3D(3, 2, 1)), gt_rotation0, 0.05, carla.Color(255,0,0,0), 0)
 
-        logging.info('plotting results')
-        Plotter.plot_ground_truth_and_estimated(collected_gt_data, p_est)
-        # Plotter.plot_ground_truth_and_gnss(gt_buffer.get_data(), gnss_data_buffer.get_data())
-        # Plotter.plot_imu_data(imu_data_buffer.get_data())
+        # logging.info('plotting results')
+        # Plotter.plot_ground_truth_and_estimated(collected_gt_data, p_est)
+        # # Plotter.plot_ground_truth_and_gnss(gt_buffer.get_data(), gnss_data_buffer.get_data())
+        # # Plotter.plot_imu_data(imu_data_buffer.get_data())
 
     finally:
         logging.info('destroying actors')
         imu.stop()
         imu.destroy()
-        gnss.stop()
-        gnss.destroy()
+        # gnss.stop()
+        # gnss.destroy()
         ego_vehicle.destroy()
 
     logging.info('done')
