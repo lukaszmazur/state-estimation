@@ -60,83 +60,70 @@ class TestQuaternionFromToEuler(unittest.TestCase):
         print(f"r1_r2={r1_r2.as_euler('xyz', degrees=True)}")
         print("\n")
 
-    def testRotationFromImu(self):
-        # based on rotation_prev and gyroscope_prev, get estimate of rotation_next
-        # Rotation is in degrees
-        # Gyroscope measurement is angular velocity in rad/sec
-
-        # dataset 1
-        gyroscope_prev = carla.Vector3D(x=-0.000001, y=-0.003408, z=-0.000001)
-        rotation_prev = carla.Rotation(pitch=-0.023161, yaw=0.600249, roll=-0.000061)
-
-        gyroscope_next = carla.Vector3D(x=-0.000001, y=-0.003796, z=-0.000005)
-        rotation_next = carla.Rotation(pitch=0.000280, yaw=0.600226, roll=-0.000061)
-
-        # dataset 2
-        gyroscope_prev = carla.Vector3D(x=0.008996, y=0.004928, z=1.065831)
-        rotation_prev = carla.Rotation(pitch=0.045120, yaw=114.229301, roll=-0.302734)
-
-        rotation_next = carla.Rotation(pitch=0.049157, yaw=120.168129, roll=-0.299591)
-
+    def _verifyRotationUpdateBasedOnGyroscope(self, gyroscope_prev, rotation_prev,
+                                              rotation_next, delta_t):
+        print(f"rotation_prev={rotation_prev}")
+        print(f"rotation_next={rotation_next}")
+        print(f"rotation_diff={(rotation_next.pitch-rotation_prev.pitch, rotation_next.yaw-rotation_prev.yaw, rotation_next.roll-rotation_prev.roll)}")
+        print("="*15)
 
         delta_t = 59.485167 - 59.385167  # 0.1 s
         print(f'delta_t = {delta_t}')
 
         delta_angles = np.array([gyroscope_prev.x, gyroscope_prev.y, gyroscope_prev.z]) * delta_t
         print(f"delta_angles={delta_angles}")
+        print(f"delta_angles(deg)={delta_angles * 180 / np.pi}")
+        print("="*15)
 
-        euler_type = 'yzx'
+        euler_type = 'xyz'
+        delta_rotation = R.from_euler(euler_type, delta_angles)
+        print(f"delta_rotation={delta_rotation.as_euler(euler_type, degrees=True)}")
 
-        # delta_rotation = R.from_euler(euler_type, delta_angles)
-        # print(f"delta_rotation={delta_rotation.as_euler(euler_type, degrees=True)}")
+        r_prev = R.from_euler(euler_type, np.array([rotation_prev.roll, rotation_prev.pitch, rotation_prev.yaw]), degrees=True)
+        print(f"r_prev2={r_prev.as_euler(euler_type, degrees=True)}")
+        print(f"r_prev2={r_prev.as_quat()}")
 
-        # delta_rotation2 = R.from_rotvec(delta_angles)
-        # print(f"delta_rotation2={delta_rotation2.as_rotvec(degrees=True)}")
+        r1_r2 = delta_rotation * r_prev
+        r_next = R.from_euler(euler_type, np.array([rotation_next.roll, rotation_next.pitch, rotation_next.yaw]), degrees=True)
 
-        delta_rotation3 = R.from_quat([1, delta_angles[0] * 0.5, delta_angles[1] * 0.5, delta_angles[2] * 0.5])
-        print(f"delta_rotation3={delta_rotation3.as_quat()}")
-
-        r_prev = R.from_euler(euler_type, np.array([rotation_prev.pitch, -rotation_prev.yaw, -rotation_prev.roll]), degrees=True)
-        print(f"r_prev={r_prev.as_quat()}")
-
-        # r_prev2 = R.from_rotvec(np.array([rotation_prev.roll, -rotation_prev.pitch, -rotation_prev.yaw]), degrees=True)
-        # print(f"r_prev2={r_prev2.as_euler(euler_type, degrees=True)}")
-
-        r2_r1 = r_prev * delta_rotation3
-        print(f"r2_r1={r2_r1.as_quat()}")
-        r1_r2 = delta_rotation3 * r_prev
+        print(f"r1_r2={r1_r2.as_euler(euler_type, degrees=True)}")
+        print(f"r_next2={r_next.as_euler(euler_type, degrees=True)}")
         print(f"r1_r2={r1_r2.as_quat()}")
+        print(f"r_next2={r_next.as_quat()}")
 
-        r_next2 = R.from_euler(euler_type, np.array([rotation_next.pitch, -rotation_next.yaw, -rotation_next.roll]), degrees=True)
-        print(f"r_next2={r_next2.as_quat()}")
-
-        # r_next2 = R.from_rotvec(np.array([rotation_next.roll, -rotation_next.pitch, -rotation_next.yaw]), degrees=True)
-        # print(f"r_next2={r_next2.as_euler(euler_type, degrees=True)}")
+        np.testing.assert_allclose(r1_r2.as_quat(), r_next.as_quat(), atol=1e-3, rtol=5e-2)
+        np.testing.assert_allclose(r1_r2.as_euler(euler_type, degrees=True),
+                                   r_next.as_euler(euler_type, degrees=True),
+                                   atol=5)
         print("\n")
+        
 
-        q1 = Quaternion(euler=np.array([rotation_prev.roll, rotation_prev.pitch, rotation_prev.yaw]))
-        # q1 = Quaternion(euler=np.array([rotation_prev.pitch, -rotation_prev.yaw, -rotation_prev.roll]))
-        print(f'q1={q1}')
+    # based on rotation_prev and gyroscope_prev, get estimate of rotation_next
+    # Rotation is in degrees
+    # Gyroscope measurement is angular velocity in rad/sec
+    def testRotationFromImu1(self):
+        gyroscope_prev = carla.Vector3D(x=-0.000001, y=-0.003408, z=-0.000001)
+        rotation_prev = carla.Rotation(pitch=-0.023161, yaw=0.600249, roll=-0.000061)
+        rotation_next = carla.Rotation(pitch=0.000280, yaw=0.600226, roll=-0.000061)
+        delta_t = 59.485167 - 59.385167  # 0.1 s
 
-        q_delta = Quaternion(w=1, x=delta_angles[0]*0.5, y=delta_angles[1]*0.5, z=delta_angles[2]*0.5)
-        print(f'q_delta={q_delta}')
+        self._verifyRotationUpdateBasedOnGyroscope(gyroscope_prev, rotation_prev, rotation_next, delta_t)
 
-        q_delta2 = Quaternion(axis_angle=delta_angles)
-        print(f'q_delta2={q_delta2}')
+    def testRotationFromImu2(self):
+        gyroscope_prev = carla.Vector3D(x=0.008996, y=0.004928, z=1.065831)
+        rotation_prev = carla.Rotation(pitch=0.045120, yaw=114.229301, roll=-0.302734)
+        rotation_next = carla.Rotation(pitch=0.049157, yaw=120.168129, roll=-0.299591)
+        delta_t = 214.335169 - 214.235169  # 0.1 s
 
-        r1_r2 = q_delta2.quat_mult_right(q1, out='Quaternion')
-        print(f'r1_r2={r1_r2}')
-        r2_r1 = q_delta2.quat_mult_left(q1, out='Quaternion')
-        print(f'r2_r1={r2_r1}')
+        self._verifyRotationUpdateBasedOnGyroscope(gyroscope_prev, rotation_prev, rotation_next, delta_t)
 
-        q2 = Quaternion(euler=np.array([rotation_next.roll, rotation_next.pitch, rotation_next.yaw]))
-        # q2 = Quaternion(euler=np.array([rotation_next.pitch, -rotation_next.yaw, -rotation_next.roll]))
-        print(f'q2={q2}')
+    def testRotationFromImu3(self):
+        gyroscope_prev = carla.Vector3D(x=0.005876, y=0.002788, z=0.265303)
+        rotation_prev = carla.Rotation(pitch=-0.038939, yaw=106.974487, roll=-0.073334)
+        rotation_next = carla.Rotation(pitch=-0.051179, yaw=108.561646, roll=-0.085419)
+        delta_t = 293.835170 - 293.735170  # 0.1 s
 
-        print("\n")
-
-
-
+        self._verifyRotationUpdateBasedOnGyroscope(gyroscope_prev, rotation_prev, rotation_next, delta_t)
 
 
 if __name__ == '__main__':
