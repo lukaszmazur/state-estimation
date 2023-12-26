@@ -12,6 +12,7 @@ from scipy.spatial.transform import Rotation as R
 
 from utils import Quaternion, angle_normalize, skew_symmetric
 
+idx = 16
 
 class Plotter():
     def __init__(self):
@@ -34,7 +35,7 @@ class Plotter():
         plt.show()
 
     @staticmethod
-    def plot_ground_truth_and_estimated(gt_data, estimated_data):
+    def plot_ground_truth_and_estimated_3d(gt_data, estimated_data):
         est_traj_fig = plt.figure(figsize=(18, 12))
         ax = est_traj_fig.add_subplot(111, projection='3d')
         ax.plot(estimated_data[:, 0], estimated_data[:, 1], estimated_data[:, 2], label='Estimated')
@@ -45,6 +46,95 @@ class Plotter():
         ax.set_title('Ground Truth and GNSS')
         ax.legend(loc=(0.62,0.77))
         ax.view_init(elev=45, azim=-50)
+
+        est_traj_fig.savefig(f'../Figure_{idx}c.png')
+
+        plt.show()
+
+    @staticmethod
+    def plot_ground_truth_and_estimated(gt_data, p_est, v_est, a_est, q_est, t_est):
+        fig = plt.figure(figsize=(26, 12))
+
+        ax_p_x = fig.add_subplot(231)
+        ax_p_x.plot(gt_data[:, 15], gt_data[:, 0], label='Ground Truth')
+        ax_p_x.plot(t_est, p_est[:, 0], label='Estimated')
+        ax_p_x.set_xlabel('Time [s]')
+        ax_p_x.set_ylabel('Position [m]')
+        ax_p_x.set_title('Position x-axis')
+        ax_p_x.legend()
+
+        ax_p_y = fig.add_subplot(232)
+        ax_p_y.plot(gt_data[:, 15], gt_data[:, 1], label='Ground Truth')
+        ax_p_y.plot(t_est, p_est[:, 1], label='Estimated')
+        ax_p_y.set_xlabel('Time [s]')
+        ax_p_y.set_ylabel('Position [m]')
+        ax_p_y.set_title('Position y-axis')
+        ax_p_y.legend()
+
+        ax_p_z = fig.add_subplot(233)
+        ax_p_z.plot(gt_data[:, 15], gt_data[:, 2], label='Ground Truth')
+        ax_p_z.plot(t_est, p_est[:, 2], label='Estimated')
+        ax_p_z.set_xlabel('Time [s]')
+        ax_p_z.set_ylabel('Position [m]')
+        ax_p_z.set_title('Position z-axis')
+        ax_p_z.legend()
+
+        def convert_quaternion_to_euler(quat_array):
+            return R.from_quat(quat_array).as_euler('xyz', degrees=True)
+        rot_est = np.apply_along_axis(convert_quaternion_to_euler, axis=1, arr=q_est)
+
+        ax_r_x = fig.add_subplot(234)
+        ax_r_x.plot(gt_data[:, 15], gt_data[:, 3], label='Ground Truth')
+        ax_r_x.plot(t_est, rot_est[:, 0], label='Estimated')
+        ax_r_x.set_xlabel('Time [s]')
+        ax_r_x.set_ylabel('Angle [deg]')
+        ax_r_x.set_title('Roll angle (x-axis)')
+        ax_r_x.legend()
+
+        ax_r_y = fig.add_subplot(235)
+        ax_r_y.plot(gt_data[:, 15], gt_data[:, 4], label='Ground Truth')
+        ax_r_y.plot(t_est, rot_est[:, 1], label='Estimated')
+        ax_r_y.set_xlabel('Time [s]')
+        ax_r_y.set_ylabel('Angle [deg]')
+        ax_r_y.set_title('Pitch angle (y-axis)')
+        ax_r_y.legend()
+
+        ax_r_z = fig.add_subplot(236)
+        ax_r_z.plot(gt_data[:, 15], gt_data[:, 5], label='Ground Truth')
+        ax_r_z.plot(t_est, rot_est[:, 2], label='Estimated')
+        ax_r_z.set_xlabel('Time [s]')
+        ax_r_z.set_ylabel('Angle [deg]')
+        ax_r_z.set_title('Yaw angle (z-axis)')
+        ax_r_z.legend()
+
+        fig2 = plt.figure(figsize=(26, 12))
+        ax_a_x = fig2.add_subplot(231)
+        ax_a_x.plot(gt_data[:, 15], gt_data[:, 12], label='Ground Truth')
+        ax_a_x.plot(t_est, a_est[:, 0], label='Estimated')
+        ax_a_x.set_xlabel('Time [s]')
+        ax_a_x.set_ylabel('Acceleration [m/s^2]')
+        ax_a_x.set_title('Acceleration x-axis')
+        ax_a_x.legend()
+
+        ax_a_y = fig2.add_subplot(232)
+        ax_a_y.plot(gt_data[:, 15], gt_data[:, 13], label='Ground Truth')
+        ax_a_y.plot(t_est, a_est[:, 1], label='Estimated')
+        ax_a_y.set_xlabel('Time [s]')
+        ax_a_y.set_ylabel('Acceleration [m/s^2]')
+        ax_a_y.set_title('Acceleration y-axis')
+        ax_a_y.legend()
+
+        ax_a_z = fig2.add_subplot(233)
+        ax_a_z.plot(gt_data[:, 15], gt_data[:, 14], label='Ground Truth')
+        ax_a_z.plot(t_est, a_est[:, 2], label='Estimated')
+        ax_a_z.set_xlabel('Time [s]')
+        ax_a_z.set_ylabel('Acceleration [m/s^2]')
+        ax_a_z.set_title('Acceleration z-axis')
+        ax_a_z.legend()
+
+        fig.savefig(f'../Figure_{idx}a.png')
+        fig2.savefig(f'../Figure_{idx}b.png')
+
         plt.show()
 
     @staticmethod
@@ -173,7 +263,7 @@ class GnssDataBuffer(RingBuffer):
     """
     def __init__(self, carla_map):
         # storing just x, y, z location after transformation for each measurement + timestamp
-        super().__init__(element_size=4, buffer_size=1000)
+        super().__init__(element_size=4, buffer_size=200)
         self._geo2location = Geo2Location(carla_map)
 
     def on_measurement(self, gnss_data):
@@ -191,10 +281,10 @@ class ImuDataBuffer(RingBuffer):
     """
     def __init__(self):
         # storing acceleration (3d) and angular velocity (3d), timestamp
-        super().__init__(element_size=7, buffer_size=1000)
+        super().__init__(element_size=7, buffer_size=2000)
 
     def on_measurement(self, imu_data):
-        logging.info(f'ImuDataBuffer: received IMU measurement with data {imu_data}, transform: {imu_data.transform}')
+        logging.debug(f'ImuDataBuffer: received IMU measurement with data {imu_data}, transform: {imu_data.transform}')
         data_array = np.array([
             imu_data.accelerometer.x, imu_data.accelerometer.y, imu_data.accelerometer.z,
             imu_data.gyroscope.x, imu_data.gyroscope.y, imu_data.gyroscope.z,
@@ -210,7 +300,7 @@ class GroundTruthBuffer(RingBuffer):
     """
     def __init__(self, ego_vehicle_id):
         # storing all information about the agent from the snapshot + timestamp
-        super().__init__(element_size=16, buffer_size=1000)
+        super().__init__(element_size=16, buffer_size=2100)
         self._ego_vehicle_id = ego_vehicle_id
 
     def on_world_tick(self, snapshot):
@@ -265,13 +355,16 @@ class EsEkfSolver():
         return location, velocity, orientation
     
     def _measurement_update(self, sensor_var, p_cov_check, y_k, p_check, v_check, q_check, h_jac):
+        logging.info("="*15 + " measurement update START " + "="*15)
         # 3.1 Compute Kalman Gain
         r_cov = np.eye(3) * (sensor_var**2)  # SOLUTION: sensor var is not squared
-        # logging.info(f'p_cov_check={p_cov_check}, h_jac={h_jac}, r_cov={r_cov}')
+        logging.info(f'p_cov_check={p_cov_check}, h_jac={h_jac}, r_cov={r_cov}')
         k_gain = p_cov_check @ h_jac.T @ np.linalg.inv(h_jac @ p_cov_check @ h_jac.T + r_cov)  # 9x3
+        logging.info(f'k_gain={k_gain}, y_k={y_k}, p_check={p_check}')
 
         # 3.2 Compute error state
         delta_x = k_gain @ (y_k - p_check)  # 9x1
+        logging.info(f'delta_x={delta_x}')
 
         # 3.3 Correct predicted state
         p_hat = p_check + delta_x[:3]
@@ -279,11 +372,15 @@ class EsEkfSolver():
         
         # q_hat = Quaternion(axis_angle=angle_normalize(delta_x[6:])).quat_mult_left(q_check)
         # q_hat = Quaternion(euler=angle_normalize(delta_x[6:])).quat_mult_left(q_check)
-        delta_angles_r = R.from_euler('xyz', angle_normalize(delta_x[6:]))
-        q_hat = (R.from_quat(q_check) * delta_angles_r).as_quat()
+        delta_angles_r = R.from_euler('xyz', delta_x[6:])
+        logging.info(f'delta_angles_r = {delta_angles_r.as_euler("xyz", degrees=True)}')
+        q_hat = (delta_angles_r * R.from_quat(q_check)).as_quat()
+        logging.info(f'q_hat = {R.from_quat(q_hat).as_euler("xyz", degrees=True)}')
 
         # 3.4 Compute corrected covariance
         p_cov_hat = (np.eye(9) - k_gain @ h_jac) @ p_cov_check
+
+        logging.info("="*15 + " measurement update END " + "="*15)
 
         return p_hat, v_hat, q_hat, p_cov_hat
 
@@ -292,9 +389,9 @@ class EsEkfSolver():
         logging.info(f'imu_data.shape={imu_data.shape}')
         logging.info(f'gnss_data.shape={gnss_data.shape}')
 
-        var_imu_f = 0.01 # 0.10
-        var_imu_w = 0.01 # 0.25
-        var_gnss  = 0.01 # 0.01
+        var_imu_f = 0.1 # 0.10
+        var_imu_w = 0.1 # 0.25
+        var_gnss  = 0.1 # 0.01
 
         g = np.array([0, 0, -9.81])  # gravity
         l_jac = np.zeros([9, 6])
@@ -309,6 +406,7 @@ class EsEkfSolver():
 
         p_est = np.zeros([imu_data.shape[0], 3])  # position estimates
         v_est = np.zeros([imu_data.shape[0], 3])  # velocity estimates
+        a_est = np.zeros([imu_data.shape[0], 3])  # acceleration estimates (TEMP)
         q_est = np.zeros([imu_data.shape[0], 4])  # orientation estimates as quaternions
         p_cov = np.zeros([imu_data.shape[0], 9, 9])  # covariance matrices at each timestep
 
@@ -321,7 +419,7 @@ class EsEkfSolver():
         # q_est[0] = Quaternion(axis_angle=gt_r0).to_numpy()
         
         # from snapshot we have rotation based on Unreal Engine's axis system (pitch, yaw, roll))
-        q_est[0] = R.from_euler('yzx', np.array([gt_r0[1], gt_r0[2], gt_r0[0]]), degrees=True).as_quat()
+        q_est[0] = R.from_euler('xyz', np.array([gt_r0[0], gt_r0[1], gt_r0[2]]), degrees=True).as_quat()
         p_cov[0] = np.zeros(9)  # covariance of estimate
         gnss_i  = 0
 
@@ -332,7 +430,7 @@ class EsEkfSolver():
         gnss = gnss_data[:, :3]
         gnss_t = gnss_data[:, 3]
 
-        logging.info(f'\nimu_f={imu_f[:3]}, \nimu_w={imu_w[:3]}, \nimu_t={imu_t[:3]}')
+        # logging.info(f'\nimu_f={imu_f[:3]}, \nimu_w={imu_w[:3]}, \nimu_t={imu_t[:3]}')
 
         for k in range(1, imu_t.shape[0]):  # start at 1 b/c we have initial prediction from gt
             delta_t = imu_t[k] - imu_t[k - 1]
@@ -340,25 +438,30 @@ class EsEkfSolver():
             # 1. Update state with IMU inputs
             # c_ns = Quaternion(*q_est[k-1]).to_mat()
             c_ns = R.from_quat(q_est[k-1]).as_matrix()
-            acceleration = c_ns @ imu_f[k-1] + g  # SOLUTION: uses np.dot instead of @
+            rotated_imu_acc = c_ns.dot(imu_f[k-1])
+            acceleration = rotated_imu_acc + g  # SOLUTION: uses np.dot instead of @
+            # acceleration = R.from_quat(q_est[k-1]).apply(imu_f[k-1]) + g
+            # print(f'acceleration from IMU:       {imu_f[k-1]}, length {np.linalg.norm(imu_f[k-1])}')
+            # print(f'acceleration after rotation: {acceleration}, length {np.linalg.norm(acceleration)}')
 
-            logging.info(f'R.from_quat(q_est[k-1]).as_euler(xyz)={R.from_quat(q_est[k-1]).as_euler("xyz", degrees=True)}')
-            logging.info(f'R.from_quat(q_est[k-1]).as_euler(XYZ)={R.from_quat(q_est[k-1]).as_euler("XYZ", degrees=True)}')
-            logging.info(f'imu_f[k-1]={imu_f[k-1]}, acceleration={acceleration}')
+            # logging.info(f'imu_f[k-1]={imu_f[k-1]}, acceleration={acceleration}')
             p_check = p_est[k-1] + delta_t * v_est[k-1] + ((delta_t ** 2) / 2) * acceleration
             v_check = v_est[k-1] + delta_t * acceleration
             # logging.info(f'p_check={p_check}, v_check={v_check}')
 
-            delta_angles = angle_normalize(imu_w[k-1] * delta_t)
+            # delta_angles = angle_normalize(imu_w[k-1] * delta_t)
+            delta_angles = imu_w[k-1] * delta_t
             # q_check = Quaternion(*q_est[k-1]).quat_mult_left(Quaternion(axis_angle=delta_angles))
             # q_check = Quaternion(*q_est[k-1]).quat_mult_left(Quaternion(euler=delta_angles))
-            delta_angles_r = R.from_euler('xyz', delta_angles)  # should be XYZ or xyz?
-            q_check = (R.from_quat(q_est[k-1]) * delta_angles_r).as_quat()
+            delta_rotation = R.from_euler('xyz', delta_angles)  # should be XYZ or xyz?
+            logging.info(f'delta_rotation = {delta_rotation.as_euler("xyz", degrees=True)}')
+            q_check = (delta_rotation * R.from_quat(q_est[k-1])).as_quat()
+            logging.info(f'q_check = {R.from_quat(q_check).as_euler("xyz", degrees=True)}')
 
             # 1.1 Linearize the motion model and compute Jacobians
             f_jac = np.eye(9)
             f_jac[:3, 3:6] = delta_t * np.eye(3)
-            f_jac[3:6, 6:] = -delta_t * skew_symmetric(c_ns @ imu_f[k-1])
+            f_jac[3:6, 6:] = -delta_t * skew_symmetric(rotated_imu_acc)
 
             # 2. Propagate uncertainty
             q_var = (delta_t**2) * q_var_const
@@ -366,26 +469,27 @@ class EsEkfSolver():
 
             # 3. Check availability of GNSS and LIDAR measurements
 
-            # if gnss_i < gnss_t.shape[0] and gnss_t[gnss_i] <= imu_t[k]:
-            #     logging.info(f"GNSS measurement available at timestep {gnss_t[gnss_i]} (IMU timestep {imu_t[k]})")
-            #     p_check, v_check, q_check, p_cov_check = self._measurement_update(
-            #         var_gnss, p_cov_check, gnss[gnss_i], p_check, v_check, q_check, h_jac)
-            #     gnss_i += 1
+            if gnss_i < gnss_t.shape[0] and gnss_t[gnss_i] <= imu_t[k]:
+                logging.info(f"GNSS measurement available at timestep {gnss_t[gnss_i]} (IMU timestep {imu_t[k]})")
+                p_check, v_check, q_check, p_cov_check = self._measurement_update(
+                    var_gnss, p_cov_check, gnss[gnss_i], p_check, v_check, q_check, h_jac)
+                gnss_i += 1
 
             # Update states (save)
 
             p_est[k] = p_check
             v_est[k] = v_check
+            a_est[k] = acceleration
             q_est[k] = q_check
             p_cov[k] = p_cov_check
 
-        return p_est, v_est, q_est, p_cov, (gt_p0, gt_v0, gt_r0)
+        return p_est, v_est, a_est, q_est, p_cov, imu_t, (gt_p0, gt_v0, gt_r0)
 
 
 def main():
 
     logging.basicConfig(format='%(levelname)s: %(funcName)s: %(message)s', level=logging.INFO,
-                        filename="output_imu_data_06.log")
+                        filename=None)
 
     client = carla.Client('localhost', 2000)
     client.set_timeout(10.0)
@@ -437,7 +541,7 @@ def main():
 
         # create IMU sensor
         imu_bp = blueprint_library.find('sensor.other.imu')
-        imu_bp.set_attribute('sensor_tick', '0.1')
+        imu_bp.set_attribute('sensor_tick', '0.05')
         # TODO: check relative location
         imu_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
         imu = world.spawn_actor(imu_bp, imu_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
@@ -452,30 +556,30 @@ def main():
         imu.listen(lambda data: imu_data_buffer.on_measurement(data))
         # imu.listen(lambda data: on_imu_measurement(data))
 
-        # # create GNSS sensor
-        # gnss_bp = blueprint_library.find('sensor.other.gnss')
-        # gnss_bp.set_attribute('sensor_tick', '1.0')
-        # # TODO: check relative location
-        # gnss_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
-        # gnss = world.spawn_actor(gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
-        # logging.info('created %s' % gnss.type_id)
-        # gnss_data_buffer = GnssDataBuffer(world.get_map())
-        # gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
+        # create GNSS sensor
+        gnss_bp = blueprint_library.find('sensor.other.gnss')
+        gnss_bp.set_attribute('sensor_tick', '0.5')
+        # TODO: check relative location
+        gnss_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
+        gnss = world.spawn_actor(gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
+        logging.info('created %s' % gnss.type_id)
+        gnss_data_buffer = GnssDataBuffer(world.get_map())
+        gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
 
         # wait for some time to collect data
-        simulation_timeout_seconds = 10
+        simulation_timeout_seconds = 120
         timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
         logging.info(f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
         for _ in range(timeout_ticks):
             world.wait_for_tick()
 
-        # # offline processing of Kalman filter
-        # # remove first few measurements, just after sensor creation (spikes)
-        # collected_imu_data = imu_data_buffer.get_data()[5:]
-        # collected_gnss_data = gnss_data_buffer.get_data()[5:]
-        # collected_gt_data = gt_buffer.get_data()[5:]
-        # p_est, v_est, q_est, p_cov, gt_values = es_ekf.process_data(collected_imu_data, collected_gnss_data, collected_gt_data)
+        # offline processing of Kalman filter
+        # remove first few measurements, just after sensor creation (spikes)
+        collected_imu_data = imu_data_buffer.get_data()[5:]
+        collected_gnss_data = gnss_data_buffer.get_data()[5:]
+        collected_gt_data = gt_buffer.get_data()[5:]
+        p_est, v_est, a_est, q_est, p_cov, t_est, gt_values = es_ekf.process_data(collected_imu_data, collected_gnss_data, collected_gt_data)
 
         # gt_p0, gt_v0, gt_r0 = gt_values
         # gt_location0 = carla.Location(x=gt_p0[0], y=gt_p0[1], z=gt_p0[2])
@@ -497,8 +601,9 @@ def main():
         # debug.draw_arrow(xyz_begin, z_end, color=blue, life_time=0)
         # debug.draw_box(carla.BoundingBox(gt_location0, carla.Vector3D(3, 2, 1)), gt_rotation0, 0.05, carla.Color(255,0,0,0), 0)
 
-        # logging.info('plotting results')
-        # Plotter.plot_ground_truth_and_estimated(collected_gt_data, p_est)
+        logging.info('plotting results')
+        Plotter.plot_ground_truth_and_estimated(collected_gt_data, p_est, v_est, a_est, q_est, t_est)
+        Plotter.plot_ground_truth_and_estimated_3d(collected_gt_data, p_est)
         # # Plotter.plot_ground_truth_and_gnss(gt_buffer.get_data(), gnss_data_buffer.get_data())
         # # Plotter.plot_imu_data(imu_data_buffer.get_data())
 
