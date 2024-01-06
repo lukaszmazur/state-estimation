@@ -568,7 +568,9 @@ def main():
         gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
 
         # setup live plotting
-        plotter = LivePlotter(gnss_data_buffer, 3, 0, "GNSS X position")
+        plotter = LivePlotter(title='GNSS: X position')
+        plotter.add_buffer(gnss_data_buffer, 3, 0, 'GNSS data')
+        plotter.add_buffer(gt_buffer, 15, 0, 'Ground Truth')
         plotter.draw()
 
         # wait for some time to collect data
