@@ -13,15 +13,17 @@ Live plotting of state estimation:
 - [x] ask ChatGPT about live plotting using matplotlib
 - [x] read saved articles
 - [x] new search
-- try to implement live plotter
+- [x] try to implement live plotter
+- [ ] make live plotters non-blocking
 
-Other:
-- refactor Kalman filter into separate class (StateEstimator)
-- create Github repo
+Kalman filter:
+- [ ] refactor Kalman filter into separate class (StateEstimator)
+- [ ] make Kalman filter "online"
 
-- extend buffered data with timestamp/frame
-- transform measurement data to fit state estimation
-- add state estimation algorithm
-- add measurement noises
-- change sensor location relative to ego vehicle
-- add LIDAR with transformation to get localization
+Simulation setup:
+- [ ] add measurement noises
+- [ ] change sensor location relative to ego vehicle
+- [ ] add LIDAR with transformation to get localization
+
+General:
+- [ ] create Github repo
