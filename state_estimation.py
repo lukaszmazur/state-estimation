@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 
 from utils import Quaternion, angle_normalize, skew_symmetric
-from live_plotter import LivePlotter
+from live_plotter import LivePlotter, LivePlotterComposer
 
 idx = 17
 
@@ -568,10 +568,24 @@ def main():
         gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
 
         # setup live plotting
-        plotter = LivePlotter(title='GNSS: X position')
-        plotter.add_buffer(gnss_data_buffer, 3, 0, 'GNSS data')
-        plotter.add_buffer(gt_buffer, 15, 0, 'Ground Truth')
-        plotter.draw()
+        logging.info('creating live plotter')
+        # plotter = LivePlotter(title='GNSS: X position')
+        # plotter.add_buffer(gnss_data_buffer, 3, 0, 'GNSS data')
+        # plotter.add_buffer(gt_buffer, 15, 0, 'Ground Truth')
+        # plotter.draw(show=True)
+        plotter_composer = LivePlotterComposer()
+        plotters = plotter_composer.add_plotters(1, 3)
+        plotters[0].set_title('GNSS: X position')
+        plotters[0].add_buffer(gnss_data_buffer, 3, 0, 'GNSS data')
+        plotters[0].add_buffer(gt_buffer, 15, 0, 'Ground Truth')
+        plotters[1].set_title('GNSS: Y position')
+        plotters[1].add_buffer(gnss_data_buffer, 3, 1, 'GNSS data')
+        plotters[1].add_buffer(gt_buffer, 15, 1, 'Ground Truth')
+        plotters[2].set_title('GNSS: Z position')
+        plotters[2].add_buffer(gnss_data_buffer, 3, 2, 'GNSS data')
+        plotters[2].add_buffer(gt_buffer, 15, 2, 'Ground Truth')
+        plotter_composer.draw()
+        logging.info('live plotter created')
 
         # wait for some time to collect data
         simulation_timeout_seconds = 120
