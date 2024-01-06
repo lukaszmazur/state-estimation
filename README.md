@@ -26,4 +26,4 @@ Simulation setup:
 - [ ] add LIDAR with transformation to get localization
 
 General:
-- [ ] create Github repo
+- [x] create Github repo

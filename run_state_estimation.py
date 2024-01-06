@@ -10,10 +10,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 
-from utils import Quaternion, angle_normalize, skew_symmetric
+from state_estimator import StateEstimator, StateEstimatesBuffer
+from utils import Quaternion, angle_normalize, skew_symmetric, RingBuffer
 from live_plotter import LivePlotter, LivePlotterComposer
 
-idx = 17
+idx = 18
 
 class Plotter():
     def __init__(self):
@@ -53,7 +54,7 @@ class Plotter():
         plt.show()
 
     @staticmethod
-    def plot_ground_truth_and_estimated(gt_data, p_est, v_est, a_est, q_est, t_est):
+    def plot_ground_truth_and_estimated(gt_data, p_est, v_est, q_est, t_est):
         fig = plt.figure(figsize=(26, 12))
 
         ax_p_x = fig.add_subplot(231)
@@ -80,61 +81,61 @@ class Plotter():
         ax_p_z.set_title('Position z-axis')
         ax_p_z.legend()
 
-        def convert_quaternion_to_euler(quat_array):
-            return R.from_quat(quat_array).as_euler('xyz', degrees=True)
-        rot_est = np.apply_along_axis(convert_quaternion_to_euler, axis=1, arr=q_est)
+        # def convert_quaternion_to_euler(quat_array):
+        #     return R.from_quat(quat_array).as_euler('xyz', degrees=True)
+        # rot_est = np.apply_along_axis(convert_quaternion_to_euler, axis=1, arr=q_est)
 
-        ax_r_x = fig.add_subplot(234)
-        ax_r_x.plot(gt_data[:, 15], gt_data[:, 3], label='Ground Truth')
-        ax_r_x.plot(t_est, rot_est[:, 0], label='Estimated')
-        ax_r_x.set_xlabel('Time [s]')
-        ax_r_x.set_ylabel('Angle [deg]')
-        ax_r_x.set_title('Roll angle (x-axis)')
-        ax_r_x.legend()
+        # ax_r_x = fig.add_subplot(234)
+        # ax_r_x.plot(gt_data[:, 15], gt_data[:, 3], label='Ground Truth')
+        # ax_r_x.plot(t_est, rot_est[:, 0], label='Estimated')
+        # ax_r_x.set_xlabel('Time [s]')
+        # ax_r_x.set_ylabel('Angle [deg]')
+        # ax_r_x.set_title('Roll angle (x-axis)')
+        # ax_r_x.legend()
 
-        ax_r_y = fig.add_subplot(235)
-        ax_r_y.plot(gt_data[:, 15], gt_data[:, 4], label='Ground Truth')
-        ax_r_y.plot(t_est, rot_est[:, 1], label='Estimated')
-        ax_r_y.set_xlabel('Time [s]')
-        ax_r_y.set_ylabel('Angle [deg]')
-        ax_r_y.set_title('Pitch angle (y-axis)')
-        ax_r_y.legend()
+        # ax_r_y = fig.add_subplot(235)
+        # ax_r_y.plot(gt_data[:, 15], gt_data[:, 4], label='Ground Truth')
+        # ax_r_y.plot(t_est, rot_est[:, 1], label='Estimated')
+        # ax_r_y.set_xlabel('Time [s]')
+        # ax_r_y.set_ylabel('Angle [deg]')
+        # ax_r_y.set_title('Pitch angle (y-axis)')
+        # ax_r_y.legend()
 
-        ax_r_z = fig.add_subplot(236)
-        ax_r_z.plot(gt_data[:, 15], gt_data[:, 5], label='Ground Truth')
-        ax_r_z.plot(t_est, rot_est[:, 2], label='Estimated')
-        ax_r_z.set_xlabel('Time [s]')
-        ax_r_z.set_ylabel('Angle [deg]')
-        ax_r_z.set_title('Yaw angle (z-axis)')
-        ax_r_z.legend()
+        # ax_r_z = fig.add_subplot(236)
+        # ax_r_z.plot(gt_data[:, 15], gt_data[:, 5], label='Ground Truth')
+        # ax_r_z.plot(t_est, rot_est[:, 2], label='Estimated')
+        # ax_r_z.set_xlabel('Time [s]')
+        # ax_r_z.set_ylabel('Angle [deg]')
+        # ax_r_z.set_title('Yaw angle (z-axis)')
+        # ax_r_z.legend()
 
-        fig2 = plt.figure(figsize=(26, 12))
-        ax_a_x = fig2.add_subplot(231)
-        ax_a_x.plot(gt_data[:, 15], gt_data[:, 12], label='Ground Truth')
-        ax_a_x.plot(t_est, a_est[:, 0], label='Estimated')
-        ax_a_x.set_xlabel('Time [s]')
-        ax_a_x.set_ylabel('Acceleration [m/s^2]')
-        ax_a_x.set_title('Acceleration x-axis')
-        ax_a_x.legend()
+        # fig2 = plt.figure(figsize=(26, 12))
+        # ax_a_x = fig2.add_subplot(231)
+        # ax_a_x.plot(gt_data[:, 15], gt_data[:, 12], label='Ground Truth')
+        # ax_a_x.plot(t_est, a_est[:, 0], label='Estimated')
+        # ax_a_x.set_xlabel('Time [s]')
+        # ax_a_x.set_ylabel('Acceleration [m/s^2]')
+        # ax_a_x.set_title('Acceleration x-axis')
+        # ax_a_x.legend()
 
-        ax_a_y = fig2.add_subplot(232)
-        ax_a_y.plot(gt_data[:, 15], gt_data[:, 13], label='Ground Truth')
-        ax_a_y.plot(t_est, a_est[:, 1], label='Estimated')
-        ax_a_y.set_xlabel('Time [s]')
-        ax_a_y.set_ylabel('Acceleration [m/s^2]')
-        ax_a_y.set_title('Acceleration y-axis')
-        ax_a_y.legend()
+        # ax_a_y = fig2.add_subplot(232)
+        # ax_a_y.plot(gt_data[:, 15], gt_data[:, 13], label='Ground Truth')
+        # ax_a_y.plot(t_est, a_est[:, 1], label='Estimated')
+        # ax_a_y.set_xlabel('Time [s]')
+        # ax_a_y.set_ylabel('Acceleration [m/s^2]')
+        # ax_a_y.set_title('Acceleration y-axis')
+        # ax_a_y.legend()
 
-        ax_a_z = fig2.add_subplot(233)
-        ax_a_z.plot(gt_data[:, 15], gt_data[:, 14], label='Ground Truth')
-        ax_a_z.plot(t_est, a_est[:, 2], label='Estimated')
-        ax_a_z.set_xlabel('Time [s]')
-        ax_a_z.set_ylabel('Acceleration [m/s^2]')
-        ax_a_z.set_title('Acceleration z-axis')
-        ax_a_z.legend()
+        # ax_a_z = fig2.add_subplot(233)
+        # ax_a_z.plot(gt_data[:, 15], gt_data[:, 14], label='Ground Truth')
+        # ax_a_z.plot(t_est, a_est[:, 2], label='Estimated')
+        # ax_a_z.set_xlabel('Time [s]')
+        # ax_a_z.set_ylabel('Acceleration [m/s^2]')
+        # ax_a_z.set_title('Acceleration z-axis')
+        # ax_a_z.legend()
 
         fig.savefig(f'../Figure_{idx}a.png')
-        fig2.savefig(f'../Figure_{idx}b.png')
+        # fig2.savefig(f'../Figure_{idx}b.png')
 
         plt.show()
 
@@ -237,26 +238,6 @@ class Geo2Location(object):
         """ Get the 4-by-4 transform matrix """
         return self._tform
 
-class RingBuffer():
-    """
-    Base class for ring data buffers.
-    """
-    def __init__(self, element_size, buffer_size):
-        self._buffer_size = buffer_size
-        self._data = np.zeros((self._buffer_size, element_size))
-        self._number_of_elements_in_buffer = 0
-
-    def insert_element(self, element):
-        if (self._number_of_elements_in_buffer < self._buffer_size):
-            self._data[self._number_of_elements_in_buffer, :] = element
-            self._number_of_elements_in_buffer += 1
-        else:
-            # TODO: check for more efficient options
-            self._data = np.roll(self._data, -1, axis=0)
-            self._data[-1, :] = element
-    
-    def get_data(self):
-        return self._data[:self._number_of_elements_in_buffer]
 
 class GnssDataBuffer(RingBuffer):
     """
@@ -323,6 +304,8 @@ class GroundTruthBuffer(RingBuffer):
             
             self.insert_element(data_array)
             logging.debug(f'GroundTruthBuffer: elements in buffer: {self._number_of_elements_in_buffer}')
+
+
 class EsEkfSolver():
     """
     Error State Extended Kalman Filter (ES-EKF) Solver.
@@ -538,7 +521,9 @@ def main():
         spectator.set_transform(ego_vehicle.get_transform())
 
         # create Kalman filter
-        es_ekf = EsEkfSolver()
+        # es_ekf = EsEkfSolver()
+        state_estimator = StateEstimator()
+        est_buffer = StateEstimatesBuffer(buffer_size=2200)  # size = IMU + GNSS buffer sizes
 
         # create IMU sensor
         imu_bp = blueprint_library.find('sensor.other.imu')
@@ -550,12 +535,13 @@ def main():
         imu_data_buffer = ImuDataBuffer()
 
         # trigger Kalman filter on IMU measurement
-        # def on_imu_measurement(data):
-        #     imu_data_buffer.on_measurement(data)
-        #     es_ekf.on_data_change(imu_data_buffer.get_data()[-1])
+        def on_imu_measurement(data):
+            imu_data_buffer.on_measurement(data)
+            state_estimator.on_imu_measurement(imu_data_buffer.get_data()[-1])
+            est_buffer.on_estimation_update(state_estimator.get_estimates())
 
-        imu.listen(lambda data: imu_data_buffer.on_measurement(data))
-        # imu.listen(lambda data: on_imu_measurement(data))
+        # imu.listen(lambda data: imu_data_buffer.on_measurement(data))
+        imu.listen(lambda data: on_imu_measurement(data))
 
         # create GNSS sensor
         gnss_bp = blueprint_library.find('sensor.other.gnss')
@@ -565,7 +551,14 @@ def main():
         gnss = world.spawn_actor(gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
         logging.info('created %s' % gnss.type_id)
         gnss_data_buffer = GnssDataBuffer(world.get_map())
-        gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
+
+        def on_gnss_measurement(data):
+            gnss_data_buffer.on_measurement(data)
+            state_estimator.on_gnss_measurement(gnss_data_buffer.get_data()[-1])
+            est_buffer.on_estimation_update(state_estimator.get_estimates())
+        
+        # gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
+        gnss.listen(lambda data: on_gnss_measurement(data))
 
         # setup live plotting
         logging.info('creating live plotter')
@@ -584,7 +577,7 @@ def main():
         plotters[2].set_title('GNSS: Z position')
         plotters[2].add_buffer(gnss_data_buffer, 3, 2, 'GNSS data')
         plotters[2].add_buffer(gt_buffer, 15, 2, 'Ground Truth')
-        plotter_composer.draw()
+        # plotter_composer.draw()
         logging.info('live plotter created')
 
         # wait for some time to collect data
@@ -600,10 +593,18 @@ def main():
         collected_imu_data = imu_data_buffer.get_data()[5:]
         collected_gnss_data = gnss_data_buffer.get_data()[5:]
         collected_gt_data = gt_buffer.get_data()[5:]
-        p_est, v_est, a_est, q_est, p_cov, t_est, gt_values = es_ekf.process_data(collected_imu_data, collected_gnss_data, collected_gt_data)
+        # p_est, v_est, a_est, q_est, p_cov, t_est, gt_values = es_ekf.process_data(collected_imu_data, collected_gnss_data, collected_gt_data)
+        collected_est_data = est_buffer.get_data()[5:]
+        p_est = collected_est_data[:, 0:3]
+        v_est = collected_est_data[:, 3:6]
+        q_est = collected_est_data[:, 6:10]
+        t_est = collected_est_data[:, 10]
+        
+        logging.info(f'est buffer: {collected_est_data[:5, :]}')
+        logging.info(f't_est = {t_est}')
 
         logging.info('plotting results')
-        Plotter.plot_ground_truth_and_estimated(collected_gt_data, p_est, v_est, a_est, q_est, t_est)
+        Plotter.plot_ground_truth_and_estimated(collected_gt_data, p_est, v_est, q_est, t_est)
         Plotter.plot_ground_truth_and_estimated_3d(collected_gt_data, p_est)
         # # Plotter.plot_ground_truth_and_gnss(gt_buffer.get_data(), gnss_data_buffer.get_data())
         # # Plotter.plot_imu_data(imu_data_buffer.get_data())
