@@ -8,10 +8,20 @@ Dependencies for examples (`/opt/carla-simulator/PythonAPI/examples/requirements
 
 
 # TODOs
+Live plotting of state estimation:
+- [x] read basic matplotlib tutorials
+- [x] ask ChatGPT about live plotting using matplotlib
+- [x] read saved articles
+- [x] new search
+- try to implement live plotter
+
+Other:
+- refactor Kalman filter into separate class (StateEstimator)
+- create Github repo
+
 - extend buffered data with timestamp/frame
 - transform measurement data to fit state estimation
 - add state estimation algorithm
-- plot state estimation
 - add measurement noises
 - change sensor location relative to ego vehicle
 - add LIDAR with transformation to get localization

@@ -11,8 +11,9 @@ import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 
 from utils import Quaternion, angle_normalize, skew_symmetric
+from live_plotter import LivePlotter
 
-idx = 16
+idx = 17
 
 class Plotter():
     def __init__(self):
@@ -566,6 +567,10 @@ def main():
         gnss_data_buffer = GnssDataBuffer(world.get_map())
         gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
 
+        # setup live plotting
+        plotter = LivePlotter(gnss_data_buffer, 3, 0, "GNSS X position")
+        plotter.draw()
+
         # wait for some time to collect data
         simulation_timeout_seconds = 120
         timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
@@ -580,26 +585,6 @@ def main():
         collected_gnss_data = gnss_data_buffer.get_data()[5:]
         collected_gt_data = gt_buffer.get_data()[5:]
         p_est, v_est, a_est, q_est, p_cov, t_est, gt_values = es_ekf.process_data(collected_imu_data, collected_gnss_data, collected_gt_data)
-
-        # gt_p0, gt_v0, gt_r0 = gt_values
-        # gt_location0 = carla.Location(x=gt_p0[0], y=gt_p0[1], z=gt_p0[2])
-        # gt_rotation0 = carla.Rotation(roll=gt_r0[0], pitch=gt_r0[1], yaw=gt_r0[2])
-        
-        # logging.info(f"gt_rotation0={gt_rotation0}")
-
-        # z_offset = 4
-        # arrow_length = 3
-        # red = carla.Color(255,0,0,0)
-        # green = carla.Color(0,255,0,0)
-        # blue = carla.Color(0,0,255,0)
-        # xyz_begin = carla.Location(x=gt_p0[0], y=gt_p0[1], z=gt_p0[2]+z_offset)
-        # x_end = carla.Location(x=gt_p0[0]+arrow_length, y=gt_p0[1], z=gt_p0[2]+z_offset)
-        # debug.draw_arrow(xyz_begin, x_end, color=red, life_time=0)
-        # y_end = carla.Location(x=gt_p0[0], y=gt_p0[1]+arrow_length, z=gt_p0[2]+z_offset)
-        # debug.draw_arrow(xyz_begin, y_end, color=green, life_time=0)
-        # z_end = carla.Location(x=gt_p0[0], y=gt_p0[1], z=gt_p0[2]+z_offset+arrow_length)
-        # debug.draw_arrow(xyz_begin, z_end, color=blue, life_time=0)
-        # debug.draw_box(carla.BoundingBox(gt_location0, carla.Vector3D(3, 2, 1)), gt_rotation0, 0.05, carla.Color(255,0,0,0), 0)
 
         logging.info('plotting results')
         Plotter.plot_ground_truth_and_estimated(collected_gt_data, p_est, v_est, a_est, q_est, t_est)
