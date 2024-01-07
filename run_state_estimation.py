@@ -12,12 +12,11 @@ import copy
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 from scipy.spatial.transform import Rotation as R
 
 from state_estimator import StateEstimator, StateEstimatesBuffer
 from utils import Quaternion, angle_normalize, skew_symmetric, RingBuffer
-from live_plotter import LivePlotter, LivePlotterComposer
+from live_plotter import LivePlotter, LivePlotterComposer, LivePlotterProcess
 
 idx = 26
 
@@ -508,88 +507,14 @@ class EsEkfSolver():
         return p_est, v_est, a_est, q_est, p_cov, imu_t, (gt_p0, gt_v0, gt_r0)
 
 
-data = ([], [])
-
-# Function to update the plot (to be run in a separate process)
-def update_plot(q):
-    logging.info('started plotting process')
-
-    data = ([], [])
-    mutex = threading.Lock()
-
-    def retrieve_data_thread(q):
-        while True:
-            try:
-                global data
-
-                data_msg = q.get(timeout=1)  # Wait for 1 second to get data from the queue
-                logging.info(f'received new data: {data_msg}')
-                mutex.acquire()
-                data = copy.deepcopy(data_msg)
-                mutex.release()
-                # logging.info(f'data = {data}')
-            except queue.Empty:
-                continue
-
-    data_thread = threading.Thread(target=retrieve_data_thread, args=(q,))
-    data_thread.start()
-
-    fig, ax = plt.subplots()
-    line, = ax.plot([], [], lw=2)
-
-    def init():
-        line.set_data([], [])
-        return line,
-
-    def animate(frame):
-        # logging.info('animate is called')
-        try:
-            # data = q.get_nowait()  # Get data from the queue (non-blocking)
-            # logging.info(f'received new data: {data}')
-            # Update the plot with new data
-            global data
-
-            mutex.acquire()
-            x, y = data
-            mutex.release()
-
-            logging.info(f'data = {data}')
-
-            logging.info(f'x={x}, y={y}')
-
-            if len(x) == 0 or len(y) == 0:
-                logging.info('skipping')
-                return
-
-            line.set_data(x, y)
-
-            ax.set_xlim(np.min(x) - 0.1, np.max(x) + 0.1)
-            ax.set_ylim(np.min(y) - 0.1, np.max(y) + 0.1)
-        except queue.Empty:
-            # logging.info('no data received')
-            pass
-
-        return line,
-
-    ani = FuncAnimation(fig, animate, init_func=init, interval=200)
-    plt.show()
-
-    data_thread.join()
-
-
 def main():
 
     logging.basicConfig(format='%(asctime)s %(levelname)s: %(funcName)s: %(message)s',
                         level=logging.INFO, filename=f'output_{idx}.log')
     
-    # Create a multiprocessing queue
-    q = mp.Queue()
-
-    # Start a separate process for live plotting
-    plot_process = mp.Process(target=update_plot, args=(q,))
-    plot_process.start()
-
-
+    plotter_process = LivePlotterProcess()
+    plotter_process.start()
+    plotter_queue = plotter_process.get_queue()
 
     client = carla.Client('localhost', 2000)
     client.set_timeout(10.0)
@@ -666,7 +591,7 @@ def main():
             # local_plotter.plot_ground_truth_and_estimated_update(gt_buffer.get_data(), est_buffer.get_data())
             x = est_buffer.get_data()[:, 10]
             y = est_buffer.get_data()[:, 0]
-            q.put((x, y))  # Enqueue data to the queue
+            plotter_queue.put((x, y))  # Enqueue data to the queue
             mutex.release()
 
         # imu.listen(lambda data: imu_data_buffer.on_measurement(data))
@@ -691,7 +616,7 @@ def main():
             # local_plotter.plot_ground_truth_and_estimated_update(gt_buffer.get_data(), est_buffer.get_data())
             x = est_buffer.get_data()[:, 10]
             y = est_buffer.get_data()[:, 0]
-            q.put((x, y))  # Enqueue data to the queue
+            plotter_queue.put((x, y))  # Enqueue data to the queue
             mutex.release()
         
         # gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
@@ -763,8 +688,7 @@ def main():
         # gnss.destroy()
         ego_vehicle.destroy()
 
-        # Terminate the plotting process after sending data
-        plot_process.terminate()
+        plotter_process.terminate()
 
     logging.info('done')
 

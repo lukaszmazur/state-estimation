@@ -1,7 +1,12 @@
 from collections import namedtuple
 import logging
+import multiprocessing as mp
+import threading
+import copy
+import queue
+
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation
 import numpy as np
 
 
@@ -56,7 +61,7 @@ class LivePlotter():
             self._ax.set_ylim(1.1 * y_min, 1.1 * y_max)  # TODO: use relim and autoscale_view?
             return self._lines
         
-        self._ani = animation.FuncAnimation(fig=self._fig, func=update,
+        self._ani = FuncAnimation(fig=self._fig, func=update,
                                             frames=50, interval=200)
         # plt.show(block=False)
         if show:
@@ -84,3 +89,83 @@ class LivePlotterComposer():
         for plotter in self._plotters:
             plotter.draw()
         plt.show()
+
+
+# TODO: make it local
+data = ([], [])
+
+class LivePlotterProcess():
+    def __init__(self):
+        self._queue = mp.Queue()
+        # TODO: change start method to 'spawn'? 
+        self._plot_process = mp.Process(target=self.update_plot, args=(self._queue,))
+
+    def get_queue(self):
+        return self._queue
+    
+    def update_plot(self, data_queue):
+        logging.info('started plotting process')
+
+        global data
+
+        data = ([], [])
+        mutex = threading.Lock()
+
+        def retrieve_data_thread(data_queue):
+            while True:
+                try:
+                    global data
+
+                    data_msg = data_queue.get(timeout=1)  # Wait for 1 second to get data from the queue
+                    logging.info(f'received new data: {data_msg}')
+                    mutex.acquire()
+                    data = copy.deepcopy(data_msg)
+                    mutex.release()
+                    # logging.info(f'data = {data}')
+                except queue.Empty:
+                    continue
+
+        data_thread = threading.Thread(target=retrieve_data_thread, args=(self._queue,))
+        data_thread.start()
+
+        fig, ax = plt.subplots()
+        line, = ax.plot([], [], lw=2)
+
+        def init():
+            line.set_data([], [])
+            return line,
+
+        def animate(frame):
+            global data
+
+            mutex.acquire()
+            x, y = data
+            mutex.release()
+
+            logging.info(f'data = {data}')
+
+            logging.info(f'x={x}, y={y}')
+
+            if len(x) == 0 or len(y) == 0:
+                logging.info('skipping')
+                return
+
+            line.set_data(x, y)
+
+            ax.set_xlim(np.min(x) - 0.1, np.max(x) + 0.1)
+            ax.set_ylim(np.min(y) - 0.1, np.max(y) + 0.1)
+
+            return line,
+
+        ani = FuncAnimation(fig, animate, init_func=init, interval=200)
+        plt.show()
+
+        data_thread.join()
+    
+    def start(self):
+        self._plot_process.start()
+
+    def terminate(self):
+        self._plot_process.terminate()
+    
+
