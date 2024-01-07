@@ -1,4 +1,3 @@
-from collections import namedtuple
 import logging
 import multiprocessing as mp
 import threading
@@ -10,60 +9,71 @@ from matplotlib.animation import FuncAnimation
 import numpy as np
 
 
-BufferFields = namedtuple('BufferFields', ['buffer', 'x_idx', 'y_idx', 'label'])
-
 class LivePlotter():
-    def __init__(self, figure=None, axes=None, title=None):
-        self._buffers = list()
-        self._title = title
+    def __init__(self, figure=None, axes=None):
+        self._title = None
         self._fig = figure
         self._ax = axes
+        self._lines = list()
+        self._lines_data = list()
+
+        self._lock = threading.Lock()
 
     def set_title(self, title):
         self._title = title
 
-    def add_buffer(self, buffer, x_idx, y_idx, label):
-        self._buffers.append(BufferFields(buffer, x_idx, y_idx, label))
+    def add_line(self, label):
+        """
+        Returns line index.
+        """
+        line, = self._ax.plot([], [], label=label)
+        self._lines.append(line)
+        self._lines_data.append(([], []))
+        return len(self._lines) - 1
+
+    def set_data(self, x, y, line_idx):
+        with self._lock:
+            self._lines_data[line_idx] = (x, y)
 
     def draw(self, show=False):
-        if not self._buffers:
-            logging.error('no buffers to plot')
+        if not self._lines:
+            logging.error('no lines to plot')
             return
 
         if self._fig is None or self._ax is None:
             self._fig, self._ax = plt.subplots(figsize=(26, 12))
 
-        self._lines = list()
-        for buffer_fields in self._buffers:
-            data = buffer_fields.buffer.get_data()
-            line, = self._ax.plot(data[:, buffer_fields.x_idx],
-                                  data[:, buffer_fields.y_idx],
-                                  label=buffer_fields.label)
-            self._lines.append(line)
-
+        # TODO: make labels settable
         self._ax.set(xlabel='Time [s]', ylabel='Position [m]', title=self._title)
         self._ax.legend()
         self._ax.grid(True)
 
         def update(frame):
+            logging.info('updating plots')
+
             x_min, x_max, y_min, y_max = float('inf'), -float('inf'), float('inf'), -float('inf')
 
-            for buffer_fields, line in zip(self._buffers, self._lines):
-                data = buffer_fields.buffer.get_data()
-                line.set_data(data[:, buffer_fields.x_idx],
-                              data[:, buffer_fields.y_idx])
-                x_min = min(x_min, np.min(data[:, buffer_fields.x_idx]))
-                x_max = max(x_max, np.max(data[:, buffer_fields.x_idx]))
-                y_min = min(y_min, np.min(data[:, buffer_fields.y_idx]))
-                y_max = max(y_max, np.max(data[:, buffer_fields.y_idx]))
+            any_data_set = False
+            with self._lock:
+                for line_data, line in zip(self._lines_data, self._lines):
+                    x, y = line_data
+                    if len(x) == 0 or len(y) == 0:
+                        continue
+                    line.set_data(x, y)
+                    x_min = min(x_min, np.min(x))
+                    x_max = max(x_max, np.max(x))
+                    y_min = min(y_min, np.min(y))
+                    y_max = max(y_max, np.max(y))
+                    any_data_set = True
 
-            self._ax.set_xlim(x_min, x_max)
-            self._ax.set_ylim(1.1 * y_min, 1.1 * y_max)  # TODO: use relim and autoscale_view?
+            if any_data_set:
+                # TODO: use relim and autoscale_view?
+                self._ax.set_xlim(x_min, x_max)
+                self._ax.set_ylim(1.1 * y_min, 1.1 * y_max)
             return self._lines
         
-        self._ani = FuncAnimation(fig=self._fig, func=update,
-                                            frames=50, interval=200)
-        # plt.show(block=False)
+        self._ani = FuncAnimation(fig=self._fig, func=update, interval=200)
+
         if show:
             plt.show()
 
@@ -80,7 +90,7 @@ class LivePlotterComposer():
         fig, axes_list = plt.subplots(nrows, ncols, figsize=figsize)
         self._plotters = [LivePlotter(fig, axes) for axes in axes_list]
         return self._plotters
-    
+
     def draw(self):
         """
         NOTE: Drawing must be blocking when using FuncAnimation
@@ -90,9 +100,6 @@ class LivePlotterComposer():
             plotter.draw()
         plt.show()
 
-
-# TODO: make it local
-data = ([], [])
 
 class LivePlotterProcess():
     def __init__(self):
@@ -106,59 +113,38 @@ class LivePlotterProcess():
     def update_plot(self, data_queue):
         logging.info('started plotting process')
 
-        global data
-
-        data = ([], [])
-        mutex = threading.Lock()
+        plotter_composer = LivePlotterComposer()
+        plotters = plotter_composer.add_plotters(1, 3)
+        plotters[0].set_title('X position')
+        x_est_id = plotters[0].add_line('Estimated')
+        x_gt_id = plotters[0].add_line('Ground Truth')
+        plotters[1].set_title('Y position')
+        y_est_id = plotters[1].add_line('Estimated')
+        y_gt_id = plotters[1].add_line('Ground Truth')
+        plotters[2].set_title('Z position')
+        z_est_id = plotters[2].add_line('Estimated')
+        z_gt_id = plotters[2].add_line('Ground Truth')
 
         def retrieve_data_thread(data_queue):
             while True:
                 try:
-                    global data
+                    data = data_queue.get(timeout=1)  # Wait for 1 second to get data from the queue
+                    logging.info(f'received new data: {data}')
 
-                    data_msg = data_queue.get(timeout=1)  # Wait for 1 second to get data from the queue
-                    logging.info(f'received new data: {data_msg}')
-                    mutex.acquire()
-                    data = copy.deepcopy(data_msg)
-                    mutex.release()
-                    # logging.info(f'data = {data}')
+                    est_t, est_x, est_y, est_z, gt_t, gt_x, gt_y, gt_z = data
+                    plotters[0].set_data(est_t, est_x, x_est_id)
+                    plotters[0].set_data(gt_t, gt_x, x_gt_id)
+                    plotters[1].set_data(est_t, est_y, y_est_id)
+                    plotters[1].set_data(gt_t, gt_y, y_gt_id)
+                    plotters[2].set_data(est_t, est_z, z_est_id)
+                    plotters[2].set_data(gt_t, gt_z, z_gt_id)
                 except queue.Empty:
                     continue
 
         data_thread = threading.Thread(target=retrieve_data_thread, args=(self._queue,))
         data_thread.start()
 
-        fig, ax = plt.subplots()
-        line, = ax.plot([], [], lw=2)
-
-        def init():
-            line.set_data([], [])
-            return line,
-
-        def animate(frame):
-            global data
-
-            mutex.acquire()
-            x, y = data
-            mutex.release()
-
-            logging.info(f'data = {data}')
-
-            logging.info(f'x={x}, y={y}')
-
-            if len(x) == 0 or len(y) == 0:
-                logging.info('skipping')
-                return
-
-            line.set_data(x, y)
-
-            ax.set_xlim(np.min(x) - 0.1, np.max(x) + 0.1)
-            ax.set_ylim(np.min(y) - 0.1, np.max(y) + 0.1)
-
-            return line,
-
-        ani = FuncAnimation(fig, animate, init_func=init, interval=200)
-        plt.show()
+        plotter_composer.draw()
 
         data_thread.join()
     

@@ -18,7 +18,7 @@ from state_estimator import StateEstimator, StateEstimatesBuffer
 from utils import Quaternion, angle_normalize, skew_symmetric, RingBuffer
 from live_plotter import LivePlotter, LivePlotterComposer, LivePlotterProcess
 
-idx = 26
+idx = 27
 
 class Plotter():
     def __init__(self, create_figure=False):
@@ -516,6 +516,19 @@ def main():
     plotter_process.start()
     plotter_queue = plotter_process.get_queue()
 
+    def put_to_plotter_queue(est_buffer, gt_buffer):
+        plotter_queue = plotter_process.get_queue()
+        est_t = est_buffer.get_data()[:, 10]
+        est_x = est_buffer.get_data()[:, 0]
+        est_y = est_buffer.get_data()[:, 1]
+        est_z = est_buffer.get_data()[:, 2]
+        gt_t = gt_buffer.get_data()[:, 15]
+        gt_x = gt_buffer.get_data()[:, 0]
+        gt_y = gt_buffer.get_data()[:, 1]
+        gt_z = gt_buffer.get_data()[:, 2]
+        plotter_queue.put((est_t, est_x, est_y, est_z,
+                           gt_t, gt_x, gt_y, gt_z))
+
     client = carla.Client('localhost', 2000)
     client.set_timeout(10.0)
 
@@ -589,9 +602,8 @@ def main():
             state_estimator.on_imu_measurement(imu_data_buffer.get_data()[-1])
             est_buffer.on_estimation_update(state_estimator.get_estimates())
             # local_plotter.plot_ground_truth_and_estimated_update(gt_buffer.get_data(), est_buffer.get_data())
-            x = est_buffer.get_data()[:, 10]
-            y = est_buffer.get_data()[:, 0]
-            plotter_queue.put((x, y))  # Enqueue data to the queue
+            # TODO: gt_buffer is not protected by mutex
+            put_to_plotter_queue(est_buffer, gt_buffer)
             mutex.release()
 
         # imu.listen(lambda data: imu_data_buffer.on_measurement(data))
@@ -614,37 +626,13 @@ def main():
             state_estimator.on_gnss_measurement(gnss_data_buffer.get_data()[-1])
             est_buffer.on_estimation_update(state_estimator.get_estimates())
             # local_plotter.plot_ground_truth_and_estimated_update(gt_buffer.get_data(), est_buffer.get_data())
-            x = est_buffer.get_data()[:, 10]
-            y = est_buffer.get_data()[:, 0]
-            plotter_queue.put((x, y))  # Enqueue data to the queue
+            # TODO: gt_buffer is not protected by mutex
+            put_to_plotter_queue(est_buffer, gt_buffer)
             mutex.release()
         
         # gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
         gnss.listen(lambda data: on_gnss_measurement(data))
         # gnss.listen(gnss_queue.put)
-
-        # setup live plotting
-        logging.info('creating live plotter')
-        # plotter = LivePlotter(title='GNSS: X position')
-        # plotter.add_buffer(gnss_data_buffer, 3, 0, 'GNSS data')
-        # plotter.add_buffer(gt_buffer, 15, 0, 'Ground Truth')
-        # plotter.draw(show=True)
-        plotter_composer = LivePlotterComposer()
-        plotters = plotter_composer.add_plotters(1, 3)
-        plotters[0].set_title('X position')
-        plotters[0].add_buffer(gnss_data_buffer, 3, 0, 'GNSS data')
-        # plotters[0].add_buffer(est_buffer, 10, 0, 'Estimated')
-        plotters[0].add_buffer(gt_buffer, 15, 0, 'Ground Truth')
-        plotters[1].set_title('Y position')
-        plotters[1].add_buffer(gnss_data_buffer, 3, 1, 'GNSS data')
-        # plotters[1].add_buffer(est_buffer, 10, 1, 'Estimated')
-        plotters[1].add_buffer(gt_buffer, 15, 1, 'Ground Truth')
-        plotters[2].set_title('Z position')
-        plotters[2].add_buffer(gnss_data_buffer, 3, 2, 'GNSS data')
-        # plotters[2].add_buffer(est_buffer, 10, 2, 'Estimated')
-        plotters[2].add_buffer(gt_buffer, 15, 2, 'Ground Truth')
-        # plotter_composer.draw()
-        logging.info('live plotter created')
 
         # wait for some time to collect data
         simulation_timeout_seconds = 120
