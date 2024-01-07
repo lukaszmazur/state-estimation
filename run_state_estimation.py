@@ -5,6 +5,8 @@ import carla
 import random
 import time
 import logging
+from queue import Queue
+import threading
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,11 +16,15 @@ from state_estimator import StateEstimator, StateEstimatesBuffer
 from utils import Quaternion, angle_normalize, skew_symmetric, RingBuffer
 from live_plotter import LivePlotter, LivePlotterComposer
 
-idx = 18
+idx = 26
 
 class Plotter():
-    def __init__(self):
-        pass
+    def __init__(self, create_figure=False):
+        if create_figure:
+            self._fig = plt.figure(figsize=(26, 12))
+            self._ax1 = self._fig.add_subplot(231)
+            self._ax2 = self._fig.add_subplot(232)
+            self._ax3 = self._fig.add_subplot(233)
 
     @staticmethod
     def plot_ground_truth_and_gnss(gt_data, gnss_data):
@@ -138,6 +144,35 @@ class Plotter():
         # fig2.savefig(f'../Figure_{idx}b.png')
 
         plt.show()
+
+    def plot_ground_truth_and_estimated_update(self, gt_data, est_data):
+        plt.cla()
+
+        self._ax1.clear()
+        self._ax1.plot(gt_data[:, 15], gt_data[:, 0], label='Ground Truth')
+        self._ax1.plot(est_data[:, 10], est_data[:, 0], label='Estimated')
+        self._ax1.set_xlabel('Time [s]')
+        self._ax1.set_ylabel('Position [m]')
+        self._ax1.set_title('Position x-axis')
+        self._ax1.legend()
+
+        self._ax2.clear()
+        self._ax2.plot(gt_data[:, 15], gt_data[:, 1], label='Ground Truth')
+        self._ax2.plot(est_data[:, 10], est_data[:, 1], label='Estimated')
+        self._ax2.set_xlabel('Time [s]')
+        self._ax2.set_ylabel('Position [m]')
+        self._ax2.set_title('Position y-axis')
+        self._ax2.legend()
+
+        self._ax3.clear()
+        self._ax3.plot(gt_data[:, 15], gt_data[:, 2], label='Ground Truth')
+        self._ax3.plot(est_data[:, 10], est_data[:, 2], label='Estimated')
+        self._ax3.set_xlabel('Time [s]')
+        self._ax3.set_ylabel('Position [m]')
+        self._ax3.set_title('Position z-axis')
+        self._ax3.legend()
+
+        self._fig.canvas.draw()
 
     @staticmethod
     def plot_imu_data(imu_data):
@@ -473,7 +508,7 @@ class EsEkfSolver():
 def main():
 
     logging.basicConfig(format='%(levelname)s: %(funcName)s: %(message)s', level=logging.INFO,
-                        filename=None)
+                        filename=f'output_{idx}.log')
 
     client = carla.Client('localhost', 2000)
     client.set_timeout(10.0)
@@ -490,6 +525,7 @@ def main():
         settings = world.get_settings()
         seconds_per_tick = 0.05
         settings.fixed_delta_seconds = seconds_per_tick
+        settings.synchronous_mode = True
         world.apply_settings(settings)
 
         blueprint_library = world.get_blueprint_library()
@@ -509,7 +545,8 @@ def main():
         logging.info(f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
         for _ in range(timeout_ticks):
-            world.wait_for_tick()
+            # world.wait_for_tick()
+            world.tick()
 
         # collect ground truth location, etc.
         gt_buffer = GroundTruthBuffer(ego_vehicle.id)
@@ -517,7 +554,8 @@ def main():
 
         # place spectator on ego position
         spectator = world.get_spectator()
-        world_snapshot = world.wait_for_tick()  # TODO: is this needed?
+        # world_snapshot = world.wait_for_tick()  # TODO: is this needed?
+        world.tick()
         spectator.set_transform(ego_vehicle.get_transform())
 
         # create Kalman filter
@@ -533,15 +571,23 @@ def main():
         imu = world.spawn_actor(imu_bp, imu_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
         logging.info('created %s' % imu.type_id)
         imu_data_buffer = ImuDataBuffer()
+        # imu_queue = Queue()
+        mutex = threading.Lock()
+
+        # local_plotter = Plotter(create_figure=True)
 
         # trigger Kalman filter on IMU measurement
         def on_imu_measurement(data):
+            mutex.acquire()
             imu_data_buffer.on_measurement(data)
             state_estimator.on_imu_measurement(imu_data_buffer.get_data()[-1])
             est_buffer.on_estimation_update(state_estimator.get_estimates())
+            # local_plotter.plot_ground_truth_and_estimated_update(gt_buffer.get_data(), est_buffer.get_data())
+            mutex.release()
 
         # imu.listen(lambda data: imu_data_buffer.on_measurement(data))
         imu.listen(lambda data: on_imu_measurement(data))
+        # imu.listen(imu_queue.put)
 
         # create GNSS sensor
         gnss_bp = blueprint_library.find('sensor.other.gnss')
@@ -551,14 +597,19 @@ def main():
         gnss = world.spawn_actor(gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
         logging.info('created %s' % gnss.type_id)
         gnss_data_buffer = GnssDataBuffer(world.get_map())
+        # gnss_queue = Queue()
 
         def on_gnss_measurement(data):
+            mutex.acquire()
             gnss_data_buffer.on_measurement(data)
             state_estimator.on_gnss_measurement(gnss_data_buffer.get_data()[-1])
             est_buffer.on_estimation_update(state_estimator.get_estimates())
+            # local_plotter.plot_ground_truth_and_estimated_update(gt_buffer.get_data(), est_buffer.get_data())
+            mutex.release()
         
         # gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
         gnss.listen(lambda data: on_gnss_measurement(data))
+        # gnss.listen(gnss_queue.put)
 
         # setup live plotting
         logging.info('creating live plotter')
@@ -568,14 +619,17 @@ def main():
         # plotter.draw(show=True)
         plotter_composer = LivePlotterComposer()
         plotters = plotter_composer.add_plotters(1, 3)
-        plotters[0].set_title('GNSS: X position')
+        plotters[0].set_title('X position')
         plotters[0].add_buffer(gnss_data_buffer, 3, 0, 'GNSS data')
+        # plotters[0].add_buffer(est_buffer, 10, 0, 'Estimated')
         plotters[0].add_buffer(gt_buffer, 15, 0, 'Ground Truth')
-        plotters[1].set_title('GNSS: Y position')
+        plotters[1].set_title('Y position')
         plotters[1].add_buffer(gnss_data_buffer, 3, 1, 'GNSS data')
+        # plotters[1].add_buffer(est_buffer, 10, 1, 'Estimated')
         plotters[1].add_buffer(gt_buffer, 15, 1, 'Ground Truth')
-        plotters[2].set_title('GNSS: Z position')
+        plotters[2].set_title('Z position')
         plotters[2].add_buffer(gnss_data_buffer, 3, 2, 'GNSS data')
+        # plotters[2].add_buffer(est_buffer, 10, 2, 'Estimated')
         plotters[2].add_buffer(gt_buffer, 15, 2, 'Ground Truth')
         # plotter_composer.draw()
         logging.info('live plotter created')
@@ -586,7 +640,10 @@ def main():
         logging.info(f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
         for _ in range(timeout_ticks):
-            world.wait_for_tick()
+            # world.wait_for_tick()
+            world.tick()
+            # imu_data = imu_queue.get(timeout=1.0)
+            # gnss_data = imu_queue.get(timeout=1.0)
 
         # offline processing of Kalman filter
         # remove first few measurements, just after sensor creation (spikes)

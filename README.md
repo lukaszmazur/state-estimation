@@ -14,7 +14,7 @@ Live plotting of state estimation:
 - [x] read saved articles
 - [x] new search
 - [x] try to implement live plotter
-- [ ] make live plotters non-blocking
+- [ ] make live plotters non-blocking - move to separate process
 
 Kalman filter:
 - [ ] refactor Kalman filter into separate class (StateEstimator)

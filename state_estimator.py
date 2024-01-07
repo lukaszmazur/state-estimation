@@ -1,4 +1,5 @@
 import logging
+import threading
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
@@ -34,6 +35,8 @@ class StateEstimator():
         self._p_cov = np.zeros((9, 9))  # covariance matrix
         self._timestamp = 0.0
 
+        self._mutex = threading.Lock()
+
     def get_estimates(self):
         return self._p_est, self._v_est, self._q_est, self._p_cov, self._timestamp
 
@@ -52,12 +55,24 @@ class StateEstimator():
         imu_f = imu_data[0:3]
         imu_w = imu_data[3:6]
         imu_t = imu_data[6]
-        self.state_prediction(imu_t, imu_f, imu_w)
+        self._mutex.acquire()
+        logging.info(f'received\n imu_f={imu_f} \n imu_w={imu_w} \n imu_t={imu_t}')
+        try:
+            self.state_prediction(imu_t, imu_f, imu_w)
+        finally:
+            self._mutex.release()
+        logging.info('end')
 
     def on_gnss_measurement(self, gnss_data):
         gnss = gnss_data[:3]
         gnss_t = gnss_data[3]
-        self.state_correction(gnss, gnss_t)
+        self._mutex.acquire()
+        logging.info(f'received\n gnss={gnss} \n gnss_t={gnss_t}')
+        try:
+            self.state_correction(gnss, gnss_t)
+        finally:
+            self._mutex.release()
+        logging.info('end')
 
     def state_prediction(self, imu_t, imu_f, imu_w):
         """

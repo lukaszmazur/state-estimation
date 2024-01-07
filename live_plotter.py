@@ -53,7 +53,7 @@ class LivePlotter():
                 y_max = max(y_max, np.max(data[:, buffer_fields.y_idx]))
 
             self._ax.set_xlim(x_min, x_max)
-            self._ax.set_ylim(1.1 * y_min, 1.1 * y_max)
+            self._ax.set_ylim(1.1 * y_min, 1.1 * y_max)  # TODO: use relim and autoscale_view?
             return self._lines
         
         self._ani = animation.FuncAnimation(fig=self._fig, func=update,
