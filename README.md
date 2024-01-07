@@ -15,9 +15,13 @@ Live plotting of state estimation:
 - [x] new search
 - [x] try to implement live plotter
 - [ ] make live plotters non-blocking - move to separate process
+    - [ ] https://stackoverflow.com/questions/51949185/non-blocking-matplotlib-animation
 
 Kalman filter:
 - [ ] refactor Kalman filter into separate class (StateEstimator)
+- [ ] implement proper (thread safe) data retrieval from sensors
+    - [ ] read: https://carla.readthedocs.io/en/0.9.13/adv_synchrony_timestep/
+    - [ ] read: https://github.com/carla-simulator/carla/blob/master/PythonAPI/examples/synchronous_mode.py
 - [ ] make Kalman filter "online"
 
 Simulation setup:

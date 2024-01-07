@@ -77,6 +77,10 @@ class LivePlotterComposer():
         return self._plotters
     
     def draw(self):
+        """
+        NOTE: Drawing must be blocking when using FuncAnimation
+              (see https://github.com/matplotlib/matplotlib/issues/24588).
+        """
         for plotter in self._plotters:
             plotter.draw()
         plt.show()
