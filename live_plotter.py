@@ -1,21 +1,23 @@
 import logging
 import multiprocessing as mp
 import threading
-import copy
 import queue
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
 
+from utils import RingBuffer
+
 
 class LivePlotter():
-    def __init__(self, figure=None, axes=None):
+    def __init__(self, figure, axes, buffer_size=2000):
         self._title = None
         self._fig = figure
         self._ax = axes
         self._lines = list()
         self._lines_data = list()
+        self._buffer_size = buffer_size
 
         self._lock = threading.Lock()
 
@@ -28,20 +30,17 @@ class LivePlotter():
         """
         line, = self._ax.plot([], [], label=label)
         self._lines.append(line)
-        self._lines_data.append(([], []))
+        self._lines_data.append(RingBuffer(2, self._buffer_size))
         return len(self._lines) - 1
 
-    def set_data(self, x, y, line_idx):
+    def add_data(self, x, y, line_idx):
         with self._lock:
-            self._lines_data[line_idx] = (x, y)
+            self._lines_data[line_idx].insert_element(np.array([x, y]))
 
     def draw(self, show=False):
         if not self._lines:
             logging.error('no lines to plot')
             return
-
-        if self._fig is None or self._ax is None:
-            self._fig, self._ax = plt.subplots(figsize=(26, 12))
 
         # TODO: make labels settable
         self._ax.set(xlabel='Time [s]', ylabel='Position [m]', title=self._title)
@@ -56,7 +55,9 @@ class LivePlotter():
             any_data_set = False
             with self._lock:
                 for line_data, line in zip(self._lines_data, self._lines):
-                    x, y = line_data
+                    data = line_data.get_data()
+                    x = data[:, 0]
+                    y = data[:, 1]
                     if len(x) == 0 or len(y) == 0:
                         continue
                     line.set_data(x, y)
@@ -68,8 +69,8 @@ class LivePlotter():
 
             if any_data_set:
                 # TODO: use relim and autoscale_view?
-                self._ax.set_xlim(x_min, x_max)
-                self._ax.set_ylim(1.1 * y_min, 1.1 * y_max)
+                self._ax.set_xlim(x_min - 0.1, x_max + 0.1)
+                self._ax.set_ylim(1.1 * y_min - 0.1, 1.1 * y_max + 0.1)
             return self._lines
         
         self._ani = FuncAnimation(fig=self._fig, func=update, interval=200)
@@ -132,12 +133,12 @@ class LivePlotterProcess():
                     logging.info(f'received new data: {data}')
 
                     est_t, est_x, est_y, est_z, gt_t, gt_x, gt_y, gt_z = data
-                    plotters[0].set_data(est_t, est_x, x_est_id)
-                    plotters[0].set_data(gt_t, gt_x, x_gt_id)
-                    plotters[1].set_data(est_t, est_y, y_est_id)
-                    plotters[1].set_data(gt_t, gt_y, y_gt_id)
-                    plotters[2].set_data(est_t, est_z, z_est_id)
-                    plotters[2].set_data(gt_t, gt_z, z_gt_id)
+                    plotters[0].add_data(est_t, est_x, x_est_id)
+                    plotters[0].add_data(gt_t, gt_x, x_gt_id)
+                    plotters[1].add_data(est_t, est_y, y_est_id)
+                    plotters[1].add_data(gt_t, gt_y, y_gt_id)
+                    plotters[2].add_data(est_t, est_z, z_est_id)
+                    plotters[2].add_data(gt_t, gt_z, z_gt_id)
                 except queue.Empty:
                     continue
 

@@ -18,7 +18,7 @@ from state_estimator import StateEstimator, StateEstimatesBuffer
 from utils import Quaternion, angle_normalize, skew_symmetric, RingBuffer
 from live_plotter import LivePlotter, LivePlotterComposer, LivePlotterProcess
 
-idx = 27
+idx = 28
 
 class Plotter():
     def __init__(self, create_figure=False):
@@ -518,14 +518,14 @@ def main():
 
     def put_to_plotter_queue(est_buffer, gt_buffer):
         plotter_queue = plotter_process.get_queue()
-        est_t = est_buffer.get_data()[:, 10]
-        est_x = est_buffer.get_data()[:, 0]
-        est_y = est_buffer.get_data()[:, 1]
-        est_z = est_buffer.get_data()[:, 2]
-        gt_t = gt_buffer.get_data()[:, 15]
-        gt_x = gt_buffer.get_data()[:, 0]
-        gt_y = gt_buffer.get_data()[:, 1]
-        gt_z = gt_buffer.get_data()[:, 2]
+        est_t = est_buffer.get_data()[:, 10][-1]
+        est_x = est_buffer.get_data()[:, 0][-1]
+        est_y = est_buffer.get_data()[:, 1][-1]
+        est_z = est_buffer.get_data()[:, 2][-1]
+        gt_t = gt_buffer.get_data()[:, 15][-1]
+        gt_x = gt_buffer.get_data()[:, 0][-1]
+        gt_y = gt_buffer.get_data()[:, 1][-1]
+        gt_z = gt_buffer.get_data()[:, 2][-1]
         plotter_queue.put((est_t, est_x, est_y, est_z,
                            gt_t, gt_x, gt_y, gt_z))
 
