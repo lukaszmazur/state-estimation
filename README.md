@@ -14,8 +14,8 @@ Live plotting of state estimation:
 - [x] read saved articles
 - [x] new search
 - [x] try to implement live plotter
-- [ ] make live plotters non-blocking - move to separate process
-    - [ ] https://stackoverflow.com/questions/51949185/non-blocking-matplotlib-animation
+- [x] make live plotters non-blocking - move to separate process
+    - [x] https://stackoverflow.com/questions/51949185/non-blocking-matplotlib-animation
 
 Kalman filter:
 - [ ] refactor Kalman filter into separate class (StateEstimator)
