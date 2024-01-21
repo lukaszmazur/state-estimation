@@ -87,8 +87,9 @@ def main():
 
         # place spectator on ego position
         spectator = world.get_spectator()
-        world.tick()
-        spectator.set_transform(ego_vehicle.get_transform())
+        transform = ego_vehicle.get_transform()
+        spectator.set_transform(carla.Transform(transform.location + carla.Location(z=50),
+                                                carla.Rotation(pitch=-90)))
 
         # create Kalman filter
         state_estimator = StateEstimator()

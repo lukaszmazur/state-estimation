@@ -11,7 +11,7 @@ from utils import RingBuffer
 
 
 class LivePlotter():
-    def __init__(self, figure, axes, buffer_size=2000):
+    def __init__(self, figure, axes, buffer_size=1000):
         self._title = None
         self._fig = figure
         self._ax = axes
@@ -50,8 +50,6 @@ class LivePlotter():
         def update(frame):
             logging.info('updating plots')
 
-            x_min, x_max, y_min, y_max = float('inf'), -float('inf'), float('inf'), -float('inf')
-
             any_data_set = False
             with self._lock:
                 for line_data, line in zip(self._lines_data, self._lines):
@@ -61,18 +59,23 @@ class LivePlotter():
                     if len(x) == 0 or len(y) == 0:
                         continue
                     line.set_data(x, y)
-                    x_min = min(x_min, np.min(x))
-                    x_max = max(x_max, np.max(x))
-                    y_min = min(y_min, np.min(y))
-                    y_max = max(y_max, np.max(y))
                     any_data_set = True
 
             if any_data_set:
-                # TODO: use relim and autoscale_view?
-                self._ax.set_xlim(x_min - 0.1, x_max + 0.1)
-                self._ax.set_ylim(1.1 * y_min - 0.1, 1.1 * y_max + 0.1)
+                self._ax.autoscale()
+                self._ax.relim()
+                self._ax.autoscale_view()
+
+                # if span of y axis is very small, set limits manually
+                # not to show very small noise spanning entire plot
+                current_ylim = self._ax.get_ylim()
+                min_y_span = 1
+                if abs(current_ylim[1] - current_ylim[0]) < min_y_span:
+                    self._ax.set_ylim(current_ylim[0] - min_y_span/2,
+                                      current_ylim[1] + min_y_span/2)
+
             return self._lines
-        
+
         self._ani = FuncAnimation(fig=self._fig, func=update, interval=200)
 
         if show:
@@ -105,12 +108,12 @@ class LivePlotterComposer():
 class LivePlotterProcess():
     def __init__(self):
         self._queue = mp.Queue()
-        # TODO: change start method to 'spawn'? 
+        # TODO: change start method to 'spawn'?
         self._plot_process = mp.Process(target=self.update_plot, args=(self._queue,))
 
     def get_queue(self):
         return self._queue
-    
+
     def update_plot(self, data_queue):
         logging.info('started plotting process')
 
@@ -148,11 +151,9 @@ class LivePlotterProcess():
         plotter_composer.draw()
 
         data_thread.join()
-    
+
     def start(self):
         self._plot_process.start()
 
     def terminate(self):
         self._plot_process.terminate()
-    
-
