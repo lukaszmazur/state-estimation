@@ -25,3 +25,5 @@ Simulation setup:
 
 General:
 - [x] create Github repo
+- [ ] add license file
+- [ ] improve this README

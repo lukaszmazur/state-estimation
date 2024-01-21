@@ -108,14 +108,22 @@ def main():
 
     def put_to_plotter_queue(est_buffer, gt_buffer):
         plotter_queue = plotter_process.get_queue()
-        est_t = est_buffer.get_data()[:, 10][-1]
-        est_x = est_buffer.get_data()[:, 0][-1]
-        est_y = est_buffer.get_data()[:, 1][-1]
-        est_z = est_buffer.get_data()[:, 2][-1]
-        gt_t = gt_buffer.get_data()[:, 15][-1]
-        gt_x = gt_buffer.get_data()[:, 0][-1]
-        gt_y = gt_buffer.get_data()[:, 1][-1]
-        gt_z = gt_buffer.get_data()[:, 2][-1]
+        # est_t = est_buffer.get_data()[:, 10][-1]
+        # est_x = est_buffer.get_data()[:, 0][-1]
+        # est_y = est_buffer.get_data()[:, 1][-1]
+        # est_z = est_buffer.get_data()[:, 2][-1]
+        # gt_t = gt_buffer.get_data()[:, 15][-1]
+        # gt_x = gt_buffer.get_data()[:, 0][-1]
+        # gt_y = gt_buffer.get_data()[:, 1][-1]
+        # gt_z = gt_buffer.get_data()[:, 2][-1]
+        est_t = est_buffer[10]
+        est_x = est_buffer[0]
+        est_y = est_buffer[1]
+        est_z = est_buffer[2]
+        gt_t = gt_buffer[15]
+        gt_x = gt_buffer[0]
+        gt_y = gt_buffer[1]
+        gt_z = gt_buffer[2]
         plotter_queue.put((est_t, est_x, est_y, est_z,
                            gt_t, gt_x, gt_y, gt_z))
 
@@ -163,7 +171,9 @@ def main():
 
         # collect ground truth location, etc.
         gt_buffer = GroundTruthBuffer(ego_vehicle.id)
-        world.on_tick(lambda snapshot: gt_buffer.on_world_tick(snapshot))
+        gt_queue = queue.Queue()
+        # world.on_tick(lambda snapshot: gt_buffer.on_world_tick(snapshot))
+        world.on_tick(gt_queue.put)
 
         # place spectator on ego position
         spectator = world.get_spectator()
@@ -184,7 +194,7 @@ def main():
         imu = world.spawn_actor(imu_bp, imu_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
         logging.info('created %s' % imu.type_id)
         imu_data_buffer = ImuDataBuffer()
-        # imu_queue = Queue()
+        imu_queue = queue.Queue()
         mutex = threading.Lock()
 
         # trigger Kalman filter on IMU measurement
@@ -198,8 +208,8 @@ def main():
             mutex.release()
 
         # imu.listen(lambda data: imu_data_buffer.on_measurement(data))
-        imu.listen(lambda data: on_imu_measurement(data))
-        # imu.listen(imu_queue.put)
+        # imu.listen(lambda data: on_imu_measurement(data))
+        imu.listen(imu_queue.put)
 
         # create GNSS sensor
         gnss_bp = blueprint_library.find('sensor.other.gnss')
@@ -209,7 +219,7 @@ def main():
         gnss = world.spawn_actor(gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
         logging.info('created %s' % gnss.type_id)
         gnss_data_buffer = GnssDataBuffer(world.get_map())
-        # gnss_queue = Queue()
+        gnss_queue = queue.Queue()
 
         def on_gnss_measurement(data):
             mutex.acquire()
@@ -221,38 +231,105 @@ def main():
             mutex.release()
 
         # gnss.listen(lambda data: gnss_data_buffer.on_measurement(data))
-        gnss.listen(lambda data: on_gnss_measurement(data))
-        # gnss.listen(gnss_queue.put)
+        # gnss.listen(lambda data: on_gnss_measurement(data))
+        gnss.listen(gnss_queue.put)
 
         # wait for some time to collect data
         simulation_timeout_seconds = 120
         timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
         logging.info(f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
+        def retrieve_data(sensor_queue, current_frame, timeout=0.1):
+            # retrieve data in the loop, because we want to get data corresponding
+            # to the current frame
+            while True:
+                data = sensor_queue.get(timeout=timeout)
+                if data.frame == current_frame:
+                    return data
+
+        geo2location = Geo2Location(world.get_map())
         for _ in range(timeout_ticks):
-        # while True:
-            # world.wait_for_tick()
-            world.tick()
+            frame = world.tick()
+            # do not catch queue.Empty exception for Ground Truth, because it
+            # must be present
+            gt_data = retrieve_data(gt_queue, frame, timeout=0.05)
 
-        # offline processing of Kalman filter
-        # remove first few measurements, just after sensor creation (spikes)
-        collected_imu_data = imu_data_buffer.get_data()[5:]
-        collected_gnss_data = gnss_data_buffer.get_data()[5:]
-        collected_gt_data = gt_buffer.get_data()[5:]
-        # p_est, v_est, a_est, q_est, p_cov, t_est, gt_values = es_ekf.process_data(collected_imu_data, collected_gnss_data, collected_gt_data)
-        collected_est_data = est_buffer.get_data()[5:]
-        p_est = collected_est_data[:, 0:3]
-        v_est = collected_est_data[:, 3:6]
-        q_est = collected_est_data[:, 6:10]
-        t_est = collected_est_data[:, 10]
+            if not gt_data.has_actor(ego_vehicle.id):
+                continue
+            actor_snapshot = gt_data.find(ego_vehicle.id)
+            gt_data_array = np.array([
+                actor_snapshot.get_transform().location.x, actor_snapshot.get_transform().location.y, actor_snapshot.get_transform().location.z,
+                actor_snapshot.get_transform().rotation.roll, actor_snapshot.get_transform().rotation.pitch, actor_snapshot.get_transform().rotation.yaw,
+                actor_snapshot.get_velocity().x, actor_snapshot.get_velocity().y, actor_snapshot.get_velocity().z,
+                actor_snapshot.get_angular_velocity().x, actor_snapshot.get_angular_velocity().y, actor_snapshot.get_angular_velocity().z,
+                actor_snapshot.get_acceleration().x, actor_snapshot.get_acceleration().y, actor_snapshot.get_acceleration().z,
+                gt_data.timestamp.elapsed_seconds
+                ])
 
-        logging.info('plotting results')
-        plot_ground_truth_and_estimated(collected_gt_data, p_est, v_est, q_est, t_est, output_path)
-        plot_ground_truth_and_estimated_3d(collected_gt_data, p_est, output_path)
-        # plot_ground_truth_and_gnss(gt_buffer.get_data(), gnss_data_buffer.get_data())
-        # plot_imu_data(imu_data_buffer.get_data())
+            try:
+                imu_data = retrieve_data(imu_queue, frame, timeout=0.01)
+                imu_data_array = np.array([
+                    imu_data.accelerometer.x, imu_data.accelerometer.y, imu_data.accelerometer.z,
+                    imu_data.gyroscope.x, imu_data.gyroscope.y, imu_data.gyroscope.z,
+                    imu_data.timestamp
+                    ])
+                logging.info(f'IMU data: {imu_data}')
+                state_estimator.on_imu_measurement(imu_data_array)
+            except queue.Empty:
+                pass
+
+            try:
+                gnss_data = retrieve_data(gnss_queue, frame, timeout=0.01)
+                location = geo2location.transform(
+                    carla.GeoLocation(gnss_data.latitude, gnss_data.longitude, gnss_data.altitude))
+                gnss_data_array = np.array([location.x, location.y, location.z, gnss_data.timestamp])
+                logging.info(f'GNSS data: {gnss_data}')
+                state_estimator.on_gnss_measurement(gnss_data_array)
+            except queue.Empty:
+                pass
+
+            p_est, v_est, q_est, p_cov, timestamp = state_estimator.get_estimates()
+            est_data_array = np.concatenate((p_est, v_est, q_est, [timestamp]))
+            logging.info(f'EST data: {est_data_array} \nGT data: {gt_data_array}')
+
+            try:
+                put_to_plotter_queue(est_data_array, gt_data_array)
+            except Exception as e:
+                logging.error(f'exception {e}')
+                raise
+            logging.info('finished iteration')
+
+
+        # # offline processing of Kalman filter
+        # # remove first few measurements, just after sensor creation (spikes)
+        # collected_imu_data = imu_data_buffer.get_data()[5:]
+        # collected_gnss_data = gnss_data_buffer.get_data()[5:]
+        # collected_gt_data = gt_buffer.get_data()[5:]
+        # # p_est, v_est, a_est, q_est, p_cov, t_est, gt_values = es_ekf.process_data(collected_imu_data, collected_gnss_data, collected_gt_data)
+        # collected_est_data = est_buffer.get_data()[5:]
+        # p_est = collected_est_data[:, 0:3]
+        # v_est = collected_est_data[:, 3:6]
+        # q_est = collected_est_data[:, 6:10]
+        # t_est = collected_est_data[:, 10]
+
+        # logging.info('plotting results')
+        # plot_ground_truth_and_estimated(collected_gt_data, p_est, v_est, q_est, t_est, output_path)
+        # plot_ground_truth_and_estimated_3d(collected_gt_data, p_est, output_path)
+        # # plot_ground_truth_and_gnss(gt_buffer.get_data(), gnss_data_buffer.get_data())
+        # # plot_imu_data(imu_data_buffer.get_data())
 
     finally:
+        logging.info('terminating plotter')
+        plotter_process.terminate()
+
+        # disable sync mode before the script ends to prevent the server blocking
+        logging.info('disabling synchronous mode')
+        settings = world.get_settings()
+        settings.synchronous_mode = False
+        tm.set_synchronous_mode(False)
+        world.apply_settings(settings)
+        world.tick()
+
         logging.info('destroying actors')
         imu.stop()
         imu.destroy()
@@ -260,17 +337,11 @@ def main():
         gnss.destroy()
         ego_vehicle.destroy()
 
-        # disable sync mode before the script ends to prevent the server blocking
-        settings = world.get_settings()
-        settings.synchronous_mode = False
-        tm.set_synchronous_mode(False)
-        world.apply_settings(settings)
-        world.tick()
-
-        plotter_process.terminate()
-
     logging.info('='*20 + ' FINISHED ' + '='*20)
 
 if __name__ == '__main__':
 
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        logging.info('\nCancelled by user. Bye!')
