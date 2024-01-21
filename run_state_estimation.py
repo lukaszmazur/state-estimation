@@ -135,7 +135,11 @@ def main():
         seconds_per_tick = 0.05
         settings.fixed_delta_seconds = seconds_per_tick
         settings.synchronous_mode = True
+        # synchronous mode must be also set for Traffic Manager
+        tm = client.get_trafficmanager()
+        tm.set_synchronous_mode(True)
         world.apply_settings(settings)
+        world.tick()
 
         blueprint_library = world.get_blueprint_library()
 
@@ -255,6 +259,13 @@ def main():
         gnss.stop()
         gnss.destroy()
         ego_vehicle.destroy()
+
+        # disable sync mode before the script ends to prevent the server blocking
+        settings = world.get_settings()
+        settings.synchronous_mode = False
+        tm.set_synchronous_mode(False)
+        world.apply_settings(settings)
+        world.tick()
 
         plotter_process.terminate()
 

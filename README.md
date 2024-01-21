@@ -8,21 +8,15 @@ Dependencies for examples (`/opt/carla-simulator/PythonAPI/examples/requirements
 
 
 # TODOs
-Live plotting of state estimation:
-- [x] read basic matplotlib tutorials
-- [x] ask ChatGPT about live plotting using matplotlib
-- [x] read saved articles
-- [x] new search
-- [x] try to implement live plotter
-- [x] make live plotters non-blocking - move to separate process
-    - [x] https://stackoverflow.com/questions/51949185/non-blocking-matplotlib-animation
-
 Kalman filter:
-- [ ] refactor Kalman filter into separate class (StateEstimator)
 - [ ] implement proper (thread safe) data retrieval from sensors
     - [ ] read: https://carla.readthedocs.io/en/0.9.13/adv_synchrony_timestep/
     - [ ] read: https://github.com/carla-simulator/carla/blob/master/PythonAPI/examples/synchronous_mode.py
 - [ ] make Kalman filter "online"
+
+Plotting:
+- [ ] set minima axis span (esp. for position Z)
+- [ ] plot more data (orientation, etc.)
 
 Simulation setup:
 - [ ] add measurement noises
