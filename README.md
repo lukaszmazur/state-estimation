@@ -17,15 +17,16 @@ Kalman filter:
 
 Plotting:
 - [x] set minima axis span (esp. for position Z)
-- [ ] plot more data (orientation, etc.)
+- [ ] __plot more data (orientation, etc.)__
 
 Simulation setup:
 - [ ] add measurement noises
 - [ ] change sensor location relative to ego vehicle
 - [ ] add LIDAR with transformation to get localization
-- [ ] make spectator follow the ego vehicle
+- [x] make spectator follow the ego vehicle
 
 General:
 - [x] create Github repo
-- [ ] add license file
-- [ ] improve this README
+- [ ] __add license file__
+- [ ] __improve this README__
+- [ ] __add screenshots__
