@@ -1,6 +1,5 @@
 import logging
 import queue
-import numpy as np
 
 import carla
 from carla_utils import Geo2Location
@@ -49,26 +48,26 @@ class SensorReceiver():
             world_snapshot.timestamp.elapsed_seconds)
 
         try:
-            imu_data = self._retrieve_data(self._imu_queue, frame, timeout=0.01)
-            imu_data_array = np.array([
-                imu_data.accelerometer.x, imu_data.accelerometer.y, imu_data.accelerometer.z,
-                imu_data.gyroscope.x, imu_data.gyroscope.y, imu_data.gyroscope.z,
-                imu_data.timestamp
-                ])
+            imu_sensor_data = self._retrieve_data(self._imu_queue, frame, timeout=0.01)
+            imu_data = (
+                imu_sensor_data.accelerometer.x, imu_sensor_data.accelerometer.y, imu_sensor_data.accelerometer.z,
+                imu_sensor_data.gyroscope.x, imu_sensor_data.gyroscope.y, imu_sensor_data.gyroscope.z,
+                imu_sensor_data.timestamp
+                )
             logging.info(f'IMU data: {imu_data}')
         except queue.Empty:
-            imu_data_array = None
+            imu_data = None
 
         try:
-            gnss_data = self._retrieve_data(self._gnss_queue, frame, timeout=0.01)
+            gnss_sensor_data = self._retrieve_data(self._gnss_queue, frame, timeout=0.01)
             location = self._geo2location.transform(
-                carla.GeoLocation(gnss_data.latitude, gnss_data.longitude, gnss_data.altitude))
-            gnss_data_array = np.array([location.x, location.y, location.z, gnss_data.timestamp])
+                carla.GeoLocation(gnss_sensor_data.latitude, gnss_sensor_data.longitude, gnss_sensor_data.altitude))
+            gnss_data = (location.x, location.y, location.z, gnss_sensor_data.timestamp)
             logging.info(f'GNSS data: {gnss_data}')
         except queue.Empty:
-            gnss_data_array = None
+            gnss_data = None
 
-        return gt_data, imu_data_array, gnss_data_array
+        return gt_data, imu_data, gnss_data
 
 
     def _retrieve_data(self, sensor_queue, current_frame, timeout=0.1):

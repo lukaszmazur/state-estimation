@@ -1,9 +1,8 @@
 import logging
-import threading
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from utils import RingBuffer, skew_symmetric
+from utils import skew_symmetric
 
 
 class StateEstimator():
@@ -30,54 +29,49 @@ class StateEstimator():
         # state estimates
         self._p_est = np.zeros(3)  # position estimates
         self._v_est = np.zeros(3)  # velocity estimates
-        # self._q_est = np.zeros(4)  # orientation estimates as quaternions
         self._q_est = R.from_euler('xyz', np.array([0., 0., 0.])).as_quat() # orientation estimates as quaternions
         self._p_cov = np.zeros((9, 9))  # covariance matrix
         self._timestamp = 0.0
 
-        self._mutex = threading.Lock()
+        self._is_initialized = False
 
     def get_estimates(self):
         return self._p_est, self._v_est, self._q_est, self._p_cov, self._timestamp
+
+    def is_initialized(self):
+        return self._is_initialized
 
     def initialize_state(self, gt_data):
         """
         Set initial values for estimates based on the ground truth.
         """
-        gt_p0, gt_v0, gt_r0 = gt_data
+        logging.info(f'initializing state estimator with {gt_data}')
+        gt_p0 = np.array(gt_data[0:3])
+        gt_r0 = np.array(gt_data[3:6])
+        gt_v0 = np.array(gt_data[6:9])
 
         self._p_est = gt_p0
         self._v_est = gt_v0
         self._q_est = R.from_euler('xyz', np.array([gt_r0[0], gt_r0[1], gt_r0[2]]), degrees=True).as_quat()
-        self._p_cov = np.zeros(9)
+
+        self._is_initialized = True
 
     def on_imu_measurement(self, imu_data):
-        imu_f = imu_data[0:3]
-        imu_w = imu_data[3:6]
-        imu_t = imu_data[6]
-        self._mutex.acquire()
-        logging.info(f'received\n imu_f={imu_f} \n imu_w={imu_w} \n imu_t={imu_t}')
-        try:
-            self.state_prediction(imu_t, imu_f, imu_w)
-        finally:
-            self._mutex.release()
-        logging.info('end')
+        imu_f = np.array(imu_data[0:3])
+        imu_w = np.array(imu_data[3:6])
+        imu_t = np.array(imu_data[6])
+        self.state_prediction(imu_t, imu_f, imu_w)
 
     def on_gnss_measurement(self, gnss_data):
-        gnss = gnss_data[:3]
-        gnss_t = gnss_data[3]
-        self._mutex.acquire()
-        logging.info(f'received\n gnss={gnss} \n gnss_t={gnss_t}')
-        try:
-            self.state_correction(gnss, gnss_t)
-        finally:
-            self._mutex.release()
-        logging.info('end')
+        gnss = np.array(gnss_data[:3])
+        gnss_t = np.array(gnss_data[3])
+        self.state_correction(gnss, gnss_t)
 
     def state_prediction(self, imu_t, imu_f, imu_w):
         """
         State update based on IMU measurement.
         """
+        logging.info('performing state prediction')
         # skip initial measurement when timestamp is not set
         if self._previous_prediction_timestamp == 0.0:
             self._previous_prediction_timestamp = imu_t
@@ -117,6 +111,7 @@ class StateEstimator():
         """
         Correct predicted state using GNSS measurement.
         """
+        logging.info('initializing state correction')
         sensor_var = self._var_gnss
         h_jac = self._h_jac
 
@@ -135,7 +130,7 @@ class StateEstimator():
         # 3.3 Correct predicted state
         p_hat = p_check + delta_x[:3]
         v_hat = v_check + delta_x[3:6]
-        
+
         delta_angles_r = R.from_euler('xyz', delta_x[6:])
         q_hat = (delta_angles_r * R.from_quat(q_check)).as_quat()
 
@@ -148,20 +143,3 @@ class StateEstimator():
         self._q_est = q_hat
         self._p_cov = p_cov_hat
         self._timestamp = gnss_t
-
-
-class StateEstimatesBuffer(RingBuffer):
-    """
-    Class storing states estimates.
-    """
-    def __init__(self, buffer_size):
-        # storing position (3), velocity (3) and orientation (4) + timestamp
-        # NOTE: not storing covariance, because it has shape incompatible with RingBuffer
-        super().__init__(element_size=11, buffer_size=buffer_size)
-
-    def on_estimation_update(self, state_estimations):
-            # logging.info(f'received estimation update: {state_estimations}')
-            p_est, v_est, q_est, p_cov, timestamp = state_estimations
-            data_array = np.concatenate((p_est, v_est, q_est, [timestamp]))
-            self.insert_element(data_array)
-

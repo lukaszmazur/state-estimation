@@ -87,7 +87,6 @@ def main():
 
         # place spectator on ego position
         spectator = world.get_spectator()
-        # world_snapshot = world.wait_for_tick()  # TODO: is this needed?
         world.tick()
         spectator.set_transform(ego_vehicle.get_transform())
 
@@ -123,10 +122,14 @@ def main():
             frame = world.tick()
             gt_data, imu_data, gnss_data = sensor_receiver.retrieve_data(frame)
 
-            if imu_data is not None:
+            if gt_data and not state_estimator.is_initialized():
+                # simplification, initialize based on the ground truth
+                state_estimator.initialize_state(gt_data)
+
+            if imu_data:
                 state_estimator.on_imu_measurement(imu_data)
 
-            if gnss_data is not None:
+            if gnss_data:
                 state_estimator.on_gnss_measurement(gnss_data)
 
             est_data = state_estimator.get_estimates()

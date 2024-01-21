@@ -13,6 +13,7 @@ Kalman filter:
     - [x] read: https://carla.readthedocs.io/en/0.9.13/adv_synchrony_timestep/
     - [x] read: https://github.com/carla-simulator/carla/blob/master/PythonAPI/examples/synchronous_mode.py
 - [x] make Kalman filter "online"
+- [ ] initialize Kalman filter based on Ground Truth
 
 Plotting:
 - [ ] set minima axis span (esp. for position Z)
