@@ -9,10 +9,10 @@ Dependencies for examples (`/opt/carla-simulator/PythonAPI/examples/requirements
 
 # TODOs
 Kalman filter:
-- [ ] implement proper (thread safe) data retrieval from sensors
-    - [ ] read: https://carla.readthedocs.io/en/0.9.13/adv_synchrony_timestep/
-    - [ ] read: https://github.com/carla-simulator/carla/blob/master/PythonAPI/examples/synchronous_mode.py
-- [ ] make Kalman filter "online"
+- [x] implement proper (thread safe) data retrieval from sensors
+    - [x] read: https://carla.readthedocs.io/en/0.9.13/adv_synchrony_timestep/
+    - [x] read: https://github.com/carla-simulator/carla/blob/master/PythonAPI/examples/synchronous_mode.py
+- [x] make Kalman filter "online"
 
 Plotting:
 - [ ] set minima axis span (esp. for position Z)
