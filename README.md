@@ -17,7 +17,7 @@ Kalman filter:
 
 Plotting:
 - [x] set minima axis span (esp. for position Z)
-- [ ] __plot more data (orientation, etc.)__
+- [ ] __plot more data (orientation, velocity, 3D, 2D XY plane, etc.)__
 
 Simulation setup:
 - [ ] add measurement noises
@@ -30,3 +30,5 @@ General:
 - [ ] __add license file__
 - [ ] __improve this README__
 - [ ] __add screenshots__
+- [ ] cleanup Git history
+- [ ] review entire codebase

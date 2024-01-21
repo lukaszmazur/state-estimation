@@ -136,8 +136,9 @@ def main():
             est_data = state_estimator.get_estimates()
             put_to_plotter_queue(est_data, gt_data)
 
-            spectator.set_transform(carla.Transform(carla.Location(x=gt_data[0], y=gt_data[1], z=gt_data[2]+2.5),
-                                                    carla.Rotation(roll=gt_data[3], pitch=gt_data[4]-20, yaw=gt_data[5])))
+            spectator_transform = carla.Transform(carla.Location(x=gt_data[0], y=gt_data[1], z=gt_data[2]+2.5),
+                                                  carla.Rotation(roll=gt_data[3], pitch=gt_data[4]-20, yaw=gt_data[5]))
+            client.apply_batch_sync([carla.command.ApplyTransform(spectator.id, spectator_transform)])
 
 
     finally:
