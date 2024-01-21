@@ -73,7 +73,7 @@ def main():
         ego_vehicle.set_autopilot(True)
 
         # wait a few seconds before starting collecting measurements
-        simulation_timeout_seconds = 30
+        simulation_timeout_seconds = 10
         timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
         logging.info(f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
@@ -135,6 +135,9 @@ def main():
 
             est_data = state_estimator.get_estimates()
             put_to_plotter_queue(est_data, gt_data)
+
+            spectator.set_transform(carla.Transform(carla.Location(x=gt_data[0], y=gt_data[1], z=gt_data[2]+2.5),
+                                                    carla.Rotation(roll=gt_data[3], pitch=gt_data[4]-20, yaw=gt_data[5])))
 
 
     finally:
