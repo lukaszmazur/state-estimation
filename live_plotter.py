@@ -43,7 +43,7 @@ class LivePlotter():
         with self._lock:
             self._lines_data[line_idx].insert_element(np.array([x, y]))
 
-    def draw(self, show=False):
+    def draw(self):
         if not self._lines:
             logging.error('no lines to plot')
             return
@@ -83,26 +83,22 @@ class LivePlotter():
 
         self._ani = FuncAnimation(fig=self._fig, func=update, interval=200)
 
-        if show:
-            plt.show()
-
 
 class LivePlotterComposer():
     def __init__(self):
-        self._nrows = None
-        self._ncols = None
         self._plotters = list()
 
     def add_plotters(self, nrows, ncols, figsize=(30, 20)):
-        self._nrows = nrows
-        self._ncols = ncols
         fig, axes_list = plt.subplots(nrows, ncols, figsize=figsize)
-        # axes_list can be either 1D or 2D
-        if len(axes_list.shape) == 1:
-            self._plotters = [LivePlotter(fig, axes) for axes in axes_list]
+        # axes_list can be either a scalar, 1D or 2D array
+        if not isinstance(axes_list, np.ndarray):
+            added_plotters = [LivePlotter(fig, axes_list)]
+        elif len(axes_list.shape) == 1:
+            added_plotters = [LivePlotter(fig, axes) for axes in axes_list]
         else:
-            self._plotters = [[LivePlotter(fig, axes) for axes in row] for row in axes_list]
-        return self._plotters
+            added_plotters = [[LivePlotter(fig, axes) for axes in row] for row in axes_list]
+        self._plotters.extend(added_plotters)
+        return added_plotters
 
     def draw(self):
         """
@@ -133,9 +129,9 @@ class LivePlotterProcess():
         plotter_composer = LivePlotterComposer()
         plotters = plotter_composer.add_plotters(3, 3)
 
-        def add_lines(plotter, title, labels, ylabel):
+        def add_lines(plotter, title, labels, ylabel, xlabel='Time [s]'):
             plotter.set_title(title)
-            plotter.set_labels(xlabel='Time [s]', ylabel=ylabel)
+            plotter.set_labels(xlabel=xlabel, ylabel=ylabel)
             return [plotter.add_line(label) for label in labels]
 
         labels = ('Estimated', 'Ground Truth')
@@ -148,6 +144,9 @@ class LivePlotterProcess():
         roll_est_id, roll_gt_id = add_lines(plotters[2][0], 'Roll', labels, ylabel='Rotation [deg]')
         pitch_est_id, pitch_gt_id = add_lines(plotters[2][1], 'Pitch', labels, ylabel='Rotation [deg]')
         yaw_est_id, yaw_gt_id = add_lines(plotters[2][2], 'Yaw', labels, ylabel='Rotation [deg]')
+
+        plotter = plotter_composer.add_plotters(1, 1, figsize=(10, 10))[0]
+        xy_est_id, xy_gt_id = add_lines(plotter, 'XY position', labels, xlabel='X position [m]', ylabel='Y position[m]')
 
         def retrieve_data_thread(data_queue):
             while True:
@@ -178,6 +177,9 @@ class LivePlotterProcess():
                     plotters[2][1].add_data(gt_t, gt_pitch, pitch_gt_id)
                     plotters[2][2].add_data(est_t, est_yaw, yaw_est_id)
                     plotters[2][2].add_data(gt_t, gt_yaw, yaw_gt_id)
+
+                    plotter.add_data(est_x, est_y, xy_est_id)
+                    plotter.add_data(gt_x, gt_y, xy_gt_id)
 
                 except queue.Empty:
                     continue
