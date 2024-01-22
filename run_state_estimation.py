@@ -32,12 +32,18 @@ def main():
     def put_to_plotter_queue(est_data, gt_data):
         p_est, v_est, q_est, p_cov, est_t = est_data
         est_x, est_y, est_z = p_est
+        est_vx, est_vy, est_vz = v_est
+        est_roll, est_pitch, est_yaw = q_est
 
-        gt_x, gt_y, gt_z, *_, gt_t = gt_data
+        gt_x, gt_y, gt_z, gt_roll, gt_pitch, gt_yaw, gt_vx, gt_vy, gt_vz, *_, gt_t = gt_data
 
         plotter_queue = plotter_process.get_queue()
         plotter_queue.put((est_t, est_x, est_y, est_z,
-                           gt_t, gt_x, gt_y, gt_z))
+                           est_vx, est_vy, est_vz,
+                           est_roll, est_pitch, est_yaw,
+                           gt_t, gt_x, gt_y, gt_z,
+                           gt_vx, gt_vy, gt_vz,
+                           gt_roll, gt_pitch, gt_yaw))
 
     client = carla.Client('localhost', 2000)
     client.set_timeout(10.0)

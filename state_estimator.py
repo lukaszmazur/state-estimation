@@ -35,8 +35,11 @@ class StateEstimator():
 
         self._is_initialized = False
 
-    def get_estimates(self):
-        return self._p_est, self._v_est, self._q_est, self._p_cov, self._timestamp
+    def get_estimates(self, as_euler_angles=True):
+        orientation = self._q_est
+        if as_euler_angles:
+            orientation = R.from_quat(self._q_est).as_euler('xyz', degrees=True)
+        return self._p_est, self._v_est, orientation, self._p_cov, self._timestamp
 
     def is_initialized(self):
         return self._is_initialized
