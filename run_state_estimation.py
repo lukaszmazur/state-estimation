@@ -16,8 +16,10 @@ def main():
 
     arg_parser = ArgumentParser(description="State estimator demo for CARLA simulator")
     arg_parser.add_argument('--output', type=str, default='./output', help='Specify the output path for logs and figures')
+    arg_parser.add_argument('--timeout', type=int, default=3600, help='Number of simulated seconds for which the state estimation should run')
     args = arg_parser.parse_args()
     output_path = args.output
+    timeout = args.timeout
 
     if not os.path.exists(output_path):
         os.makedirs(output_path)
@@ -126,7 +128,7 @@ def main():
         state_estimator.initialize_state(gt_data)
 
         # run state estimation loop
-        simulation_timeout_seconds = 120
+        simulation_timeout_seconds = timeout
         timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
         logging.info(f'running estimation for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
