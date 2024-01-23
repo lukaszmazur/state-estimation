@@ -78,14 +78,6 @@ def main():
         # enable autopilot for ego vehicle
         ego_vehicle.set_autopilot(True)
 
-        # wait a few seconds before starting collecting measurements
-        simulation_timeout_seconds = 10
-        timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
-        logging.info(f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
-
-        for _ in range(timeout_ticks):
-            world.tick()
-
         # collect ground truth location, etc.
         sensor_receiver = SensorReceiver(world.get_map(), ego_vehicle.id)
         gt_queue = sensor_receiver.get_gt_queue()
@@ -120,18 +112,27 @@ def main():
         gnss_queue = sensor_receiver.get_gnss_queue()
         gnss.listen(gnss_queue.put)
 
-        # wait for some time to collect data
-        simulation_timeout_seconds = 120
+        # wait a few seconds before starting state estimator (initial few sensor measurements seems to be not reliable)
+        simulation_timeout_seconds = 3
         timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
         logging.info(f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
         for _ in range(timeout_ticks):
+            world.tick()
+
+        # initialize state estimator (use ground truth as simplification)
+        frame = world.tick()
+        gt_data, imu_data, gnss_data = sensor_receiver.retrieve_data(frame)
+        state_estimator.initialize_state(gt_data)
+
+        # run state estimation loop
+        simulation_timeout_seconds = 120
+        timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
+        logging.info(f'running estimation for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
+
+        for _ in range(timeout_ticks):
             frame = world.tick()
             gt_data, imu_data, gnss_data = sensor_receiver.retrieve_data(frame)
-
-            if gt_data and not state_estimator.is_initialized():
-                # simplification, initialize based on the ground truth
-                state_estimator.initialize_state(gt_data)
 
             if imu_data:
                 state_estimator.on_imu_measurement(imu_data)

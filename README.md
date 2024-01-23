@@ -14,10 +14,11 @@ Kalman filter:
     - [x] read: https://github.com/carla-simulator/carla/blob/master/PythonAPI/examples/synchronous_mode.py
 - [x] make Kalman filter "online"
 - [x] initialize Kalman filter based on Ground Truth
+- [x] fix initialization
 
 Plotting:
 - [x] set minima axis span (esp. for position Z)
-- [ ] __plot more data (orientation, velocity, 3D, 2D XY plane, etc.)__
+- [x] __plot more data (orientation, velocity, 3D, 2D XY plane, etc.)__
 
 Simulation setup:
 - [ ] add measurement noises

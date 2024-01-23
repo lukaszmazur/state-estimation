@@ -48,14 +48,17 @@ class StateEstimator():
         """
         Set initial values for estimates based on the ground truth.
         """
-        logging.info(f'initializing state estimator with {gt_data}')
         gt_p0 = np.array(gt_data[0:3])
         gt_r0 = np.array(gt_data[3:6])
         gt_v0 = np.array(gt_data[6:9])
+        timestamp = gt_data[15]
+
+        logging.info(f'initializing estimator with p0={gt_p0}, r0={gt_r0}, v0={gt_v0}, t={timestamp}')
 
         self._p_est = gt_p0
         self._v_est = gt_v0
         self._q_est = R.from_euler('xyz', np.array([gt_r0[0], gt_r0[1], gt_r0[2]]), degrees=True).as_quat()
+        self._previous_prediction_timestamp = timestamp
 
         self._is_initialized = True
 
@@ -114,7 +117,11 @@ class StateEstimator():
         """
         Correct predicted state using GNSS measurement.
         """
-        logging.info('initializing state correction')
+        if np.all(self._p_cov == 0):
+            logging.info('skipping correction - waiting for prediction step first')
+            return
+
+        logging.info('performing state correction')
         sensor_var = self._var_gnss
         h_jac = self._h_jac
 
