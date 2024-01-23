@@ -11,7 +11,7 @@ from utils import RingBuffer
 
 
 class LivePlotter():
-    def __init__(self, figure, axes, buffer_size=1000):
+    def __init__(self, figure, axes, buffer_size=4000):
         self._title = None
         self._xlabel = None
         self._ylabel = None
@@ -96,7 +96,7 @@ class LivePlotterComposer():
     def __init__(self):
         self._plotters = list()
 
-    def add_plotters(self, nrows, ncols, figsize=(30, 20)):
+    def add_plotters(self, nrows, ncols, figsize=(24, 12)):
         fig, axes_list = plt.subplots(nrows, ncols, figsize=figsize)
         # axes_list can be either a scalar, 1D or 2D array
         if not isinstance(axes_list, np.ndarray):
@@ -135,7 +135,7 @@ class LivePlotterProcess():
         logging.info('started plotting process')
 
         plotter_composer = LivePlotterComposer()
-        plotters = plotter_composer.add_plotters(3, 3)
+        plotters = plotter_composer.add_plotters(3, 3, figsize=(20, 20))
 
         def add_lines(plotter, title, labels, ylabel, xlabel='Time [s]', min_y_span=1):
             plotter.set_title(title)
