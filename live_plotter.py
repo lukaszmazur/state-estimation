@@ -20,6 +20,7 @@ class LivePlotter():
         self._lines = list()
         self._lines_data = list()
         self._buffer_size = buffer_size
+        self._min_y_span = 1
 
         self._lock = threading.Lock()
 
@@ -29,6 +30,14 @@ class LivePlotter():
     def set_labels(self, xlabel, ylabel):
         self._xlabel = xlabel
         self._ylabel = ylabel
+
+    def set_min_y_span(self, min_y_span):
+        """
+        Sets minimal span of y axis limits.
+        It is meant for cases where plot values oscillate around some value
+        with small amplitude (e.g. 0.5 degrees around 0).
+        """
+        self._min_y_span = min_y_span
 
     def add_line(self, label):
         """
@@ -74,10 +83,9 @@ class LivePlotter():
                 # if span of y axis is very small, set limits manually
                 # not to show very small noise spanning entire plot
                 current_ylim = self._ax.get_ylim()
-                min_y_span = 1
-                if abs(current_ylim[1] - current_ylim[0]) < min_y_span:
-                    self._ax.set_ylim(current_ylim[0] - min_y_span/2,
-                                      current_ylim[1] + min_y_span/2)
+                if abs(current_ylim[1] - current_ylim[0]) < self._min_y_span:
+                    self._ax.set_ylim(current_ylim[0] - self._min_y_span/2,
+                                      current_ylim[1] + self._min_y_span/2)
 
             return self._lines
 
@@ -129,9 +137,10 @@ class LivePlotterProcess():
         plotter_composer = LivePlotterComposer()
         plotters = plotter_composer.add_plotters(3, 3)
 
-        def add_lines(plotter, title, labels, ylabel, xlabel='Time [s]'):
+        def add_lines(plotter, title, labels, ylabel, xlabel='Time [s]', min_y_span=1):
             plotter.set_title(title)
             plotter.set_labels(xlabel=xlabel, ylabel=ylabel)
+            plotter.set_min_y_span(min_y_span)
             return [plotter.add_line(label) for label in labels]
 
         labels = ('Estimated', 'Ground Truth')
@@ -141,9 +150,9 @@ class LivePlotterProcess():
         vx_est_id, vx_gt_id = add_lines(plotters[1][0], 'X velocity', labels, ylabel='Velocity [m/s]')
         vy_est_id, vy_gt_id = add_lines(plotters[1][1], 'Y velocity', labels, ylabel='Velocity [m/s]')
         vz_est_id, vz_gt_id = add_lines(plotters[1][2], 'Z velocity', labels, ylabel='Velocity [m/s]')
-        roll_est_id, roll_gt_id = add_lines(plotters[2][0], 'Roll', labels, ylabel='Rotation [deg]')
-        pitch_est_id, pitch_gt_id = add_lines(plotters[2][1], 'Pitch', labels, ylabel='Rotation [deg]')
-        yaw_est_id, yaw_gt_id = add_lines(plotters[2][2], 'Yaw', labels, ylabel='Rotation [deg]')
+        roll_est_id, roll_gt_id = add_lines(plotters[2][0], 'Roll', labels, ylabel='Rotation [deg]', min_y_span=5)
+        pitch_est_id, pitch_gt_id = add_lines(plotters[2][1], 'Pitch', labels, ylabel='Rotation [deg]', min_y_span=5)
+        yaw_est_id, yaw_gt_id = add_lines(plotters[2][2], 'Yaw', labels, ylabel='Rotation [deg]', min_y_span=5)
 
         plotter = plotter_composer.add_plotters(1, 1, figsize=(10, 10))[0]
         xy_est_id, xy_gt_id = add_lines(plotter, 'XY position', labels, xlabel='X position [m]', ylabel='Y position[m]')
