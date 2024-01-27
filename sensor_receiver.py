@@ -91,27 +91,29 @@ class SensorReceiver():
 
         # Arbitrary noncolinear and noncoplanar points and their corresponding
         # GeoLocations.
-        vectors = ((0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1))
+        vectors = ((1, 0, 0), (0, 1, 0), (0, 0, 1))
         locs = [carla.Location(*v) for v in vectors]
         geolocs = [world_map.transform_to_geolocation(l) for l in locs]
-        # Solve the transform from geolocation to location (geolocation_to_location)
-        l = np.array([[locs[0].x, locs[1].x, locs[2].x, locs[3].x],
-                      [locs[0].y, locs[1].y, locs[2].y, locs[3].y],
-                      [locs[0].z, locs[1].z, locs[2].z, locs[3].z],
-                      [1, 1, 1, 1]], dtype=np.float)
-        g = np.array([[geolocs[0].latitude,  geolocs[1].latitude,  geolocs[2].latitude,  geolocs[3].latitude],
-                      [geolocs[0].longitude, geolocs[1].longitude, geolocs[2].longitude, geolocs[3].longitude],
-                      [geolocs[0].altitude,  geolocs[1].altitude,  geolocs[2].altitude,  geolocs[3].altitude],
-                      [1, 1, 1, 1]], dtype=np.float)
+
+        l = np.array([
+            [loc.x for loc in locs],
+            [loc.y for loc in locs],
+            [loc.z for loc in locs]
+        ], dtype=np.float)
+
+        g = np.array([
+            [geoloc.latitude for geoloc in geolocs],
+            [geoloc.longitude for geoloc in geolocs],
+            [geoloc.altitude for geoloc in geolocs]
+        ], dtype=np.float)
 
         c = l.dot(np.linalg.inv(g))
         return c
 
-    def _geolocation_to_location(self, geolocation):
+    def _geolocation_to_location(self, geoloc):
         """
         Transform from carla.GeoLocation to carla.Location.
         """
-        geoloc = np.array(
-            [geolocation.latitude, geolocation.longitude, geolocation.altitude, 1])
-        loc = self._gnss_transform.dot(geoloc.T)
-        return carla.Location(loc[0], loc[1], loc[2])
+        geoloc_array = np.array([geoloc.latitude, geoloc.longitude, geoloc.altitude])
+        loc_array = self._gnss_transform.dot(geoloc_array.T)
+        return carla.Location(*loc_array)
