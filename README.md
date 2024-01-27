@@ -28,7 +28,8 @@ Simulation setup:
 
 General:
 - [x] create Github repo
-- [ ] __add license file__
+- [x] __add license file__
+- [x] __check licenses of copied code__
 - [ ] __improve this README__
 - [ ] __add screenshots__
 - [ ] cleanup Git history

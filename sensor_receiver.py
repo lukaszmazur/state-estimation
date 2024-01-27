@@ -1,8 +1,9 @@
 import logging
 import queue
 
+import numpy as np
+
 import carla
-from carla_utils import Geo2Location
 
 
 class SensorReceiver():
@@ -12,7 +13,7 @@ class SensorReceiver():
         self._imu_queue = queue.Queue()
         self._gnss_queue = queue.Queue()
 
-        self._geo2location = Geo2Location(world_map)
+        self._gnss_transform = self._calculate_gnss_transform(world_map)
         self._ego_id = ego_id
 
     def get_gt_queue(self):
@@ -60,7 +61,7 @@ class SensorReceiver():
 
         try:
             gnss_sensor_data = self._retrieve_data(self._gnss_queue, frame, timeout=0.01)
-            location = self._geo2location.transform(
+            location = self._geolocation_to_location(
                 carla.GeoLocation(gnss_sensor_data.latitude, gnss_sensor_data.longitude, gnss_sensor_data.altitude))
             gnss_data = (location.x, location.y, location.z, gnss_sensor_data.timestamp)
             logging.info(f'GNSS data: {gnss_data}')
@@ -77,3 +78,40 @@ class SensorReceiver():
             data = sensor_queue.get(timeout=timeout)
             if data.frame == current_frame:
                 return data
+
+    @staticmethod
+    def _calculate_gnss_transform(world_map):
+        """
+        Calculates matrix to transform from carla.GeoLocation to carla.Location.
+        """
+        # Transformation between GeoLocation and Location can be written as:
+        # L = C @ G, where L is a Location matrix, C is transformation matrix
+        # and G is GeoLocation matrix.
+        # Here we solve for C = L @ G^(-1), for given Locations and GeoLocations.
+
+        # Arbitrary noncolinear and noncoplanar points and their corresponding
+        # GeoLocations.
+        vectors = ((0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1))
+        locs = [carla.Location(*v) for v in vectors]
+        geolocs = [world_map.transform_to_geolocation(l) for l in locs]
+        # Solve the transform from geolocation to location (geolocation_to_location)
+        l = np.array([[locs[0].x, locs[1].x, locs[2].x, locs[3].x],
+                      [locs[0].y, locs[1].y, locs[2].y, locs[3].y],
+                      [locs[0].z, locs[1].z, locs[2].z, locs[3].z],
+                      [1, 1, 1, 1]], dtype=np.float)
+        g = np.array([[geolocs[0].latitude,  geolocs[1].latitude,  geolocs[2].latitude,  geolocs[3].latitude],
+                      [geolocs[0].longitude, geolocs[1].longitude, geolocs[2].longitude, geolocs[3].longitude],
+                      [geolocs[0].altitude,  geolocs[1].altitude,  geolocs[2].altitude,  geolocs[3].altitude],
+                      [1, 1, 1, 1]], dtype=np.float)
+
+        c = l.dot(np.linalg.inv(g))
+        return c
+
+    def _geolocation_to_location(self, geolocation):
+        """
+        Transform from carla.GeoLocation to carla.Location.
+        """
+        geoloc = np.array(
+            [geolocation.latitude, geolocation.longitude, geolocation.altitude, 1])
+        loc = self._gnss_transform.dot(geoloc.T)
+        return carla.Location(loc[0], loc[1], loc[2])
