@@ -1,36 +1,50 @@
-This folder contains virtual environment for operating CARLA simulator (system wide Debian installation).
+# State estimation using Kalman filter
 
-carla-simulator (server, version **0.9.13**) is installed in `/opt/carla-simulator`
+This repository showcases the application of Error-State Extended Kalman Filter (ES-EKF) for state estimation within a self-driving car, utilizing the CARLA simulator.
 
-carla (client, version **0.9.13**)  in installed in this virtual environment
+This project was inspired by ["State Estimation and Localization for Self-Driving Cars"](https://www.coursera.org/learn/state-estimation-localization-self-driving-cars?specialization=self-driving-cars) from Coursera platform. Design of Kalman filter is based on the assignment from that course.
 
-Dependencies for examples (`/opt/carla-simulator/PythonAPI/examples/requirements.txt`).
+## ES-EKF
 
+Estimated vehicle state is: position (3D), velocity (3D), orientation (4D, quaternion).
 
-# TODOs
-Kalman filter:
-- [x] implement proper (thread safe) data retrieval from sensors
-    - [x] read: https://carla.readthedocs.io/en/0.9.13/adv_synchrony_timestep/
-    - [x] read: https://github.com/carla-simulator/carla/blob/master/PythonAPI/examples/synchronous_mode.py
-- [x] make Kalman filter "online"
-- [x] initialize Kalman filter based on Ground Truth
-- [x] fix initialization
+Motion model input: IMU measurements (acceleration (3D), angular velocity(3D)).
 
-Plotting:
-- [x] set minima axis span (esp. for position Z)
-- [x] __plot more data (orientation, velocity, 3D, 2D XY plane, etc.)__
+Motion model: TODO.
+
+Measurement model input: GNSS measurement (3D, transformed to CARLA location)
+
+Measurement model: TODO
+
+ES-EKF outline: TODO
+
+## Requirements
+
+[CARLA simulator](https://carla.readthedocs.io/en/0.9.13/) - tested on version **0.9.13**
+
+## Quick start
+
+In the first terminal start CARLA server (optionally with `-quality-level=Low`):
+```
+./CarlaUE4.sh
+```
+
+In the second terminal start state estimation demo (CARLA client):
+```
+./run_state_estimation.py
+```
+
+Example output:
+![example output](screenshot.png)
+
+## TODO
 
 Simulation setup:
-- [ ] add measurement noises
-- [ ] change sensor location relative to ego vehicle
-- [ ] add LIDAR with transformation to get localization
-- [x] make spectator follow the ego vehicle
+
+- add measurement noises
+- change sensor location relative to ego vehicle
+- add LIDAR with transformation to get localization
 
 General:
-- [x] create Github repo
-- [x] __add license file__
-- [x] __check licenses of copied code__
-- [ ] __improve this README__
-- [ ] __add screenshots__
-- [ ] cleanup Git history
-- [ ] review entire codebase
+
+- improve README
