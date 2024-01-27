@@ -51,12 +51,9 @@ def main():
     client.set_timeout(10.0)
 
     try:
-        # load specific map and set fixed time-step to reliably collect data
-        # from the simulation
-        # world = client.load_world('Town02')
-
         # get existing world, leave map changing to config script
         world = client.get_world()
+        # world = client.load_world('Town02')
         debug = world.debug
 
         settings = world.get_settings()
@@ -176,4 +173,4 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        logging.info('Cancelled by user. Bye!')
+        logging.info('cancelled by user')
