@@ -9,12 +9,13 @@ class StateEstimator():
     """
     Error State Extended Kalman Filter (ES-EKF) Solver.
     """
+
     def __init__(self):
         self._previous_prediction_timestamp = 0.0
 
-        self._var_imu_f = 0.1 # 0.10
-        self._var_imu_w = 0.1 # 0.25
-        self._var_gnss  = 0.1 # 0.01
+        self._var_imu_f = 0.1  # 0.10
+        self._var_imu_w = 0.1  # 0.25
+        self._var_gnss = 0.1  # 0.01
 
         self._g = np.array([0, 0, -9.81])  # gravity
         self._l_jac = np.zeros([9, 6])
@@ -23,13 +24,14 @@ class StateEstimator():
         self._h_jac[:, :3] = np.eye(3)  # measurement model jacobian
 
         self._q_var_const = np.eye(6)
-        self._q_var_const[:3,:] *= self._var_imu_f**2
-        self._q_var_const[3:,:] *= self._var_imu_w**2
+        self._q_var_const[:3, :] *= self._var_imu_f**2
+        self._q_var_const[3:, :] *= self._var_imu_w**2
 
         # state estimates
         self._p_est = np.zeros(3)  # position estimates
         self._v_est = np.zeros(3)  # velocity estimates
-        self._q_est = R.from_euler('xyz', np.array([0., 0., 0.])).as_quat() # orientation estimates as quaternions
+        # orientation estimates as quaternions
+        self._q_est = R.from_euler('xyz', np.array([0., 0., 0.])).as_quat()
         self._p_cov = np.zeros((9, 9))  # covariance matrix
         self._timestamp = 0.0
 
@@ -38,7 +40,8 @@ class StateEstimator():
     def get_estimates(self, as_euler_angles=True):
         orientation = self._q_est
         if as_euler_angles:
-            orientation = R.from_quat(self._q_est).as_euler('xyz', degrees=True)
+            orientation = R.from_quat(
+                self._q_est).as_euler('xyz', degrees=True)
         return self._p_est, self._v_est, orientation, self._p_cov, self._timestamp
 
     def is_initialized(self):
@@ -53,11 +56,13 @@ class StateEstimator():
         gt_v0 = np.array(gt_data[6:9])
         timestamp = gt_data[15]
 
-        logging.info(f'initializing estimator with p0={gt_p0}, r0={gt_r0}, v0={gt_v0}, t={timestamp}')
+        logging.info(
+            f'initializing estimator with p0={gt_p0}, r0={gt_r0}, v0={gt_v0}, t={timestamp}')
 
         self._p_est = gt_p0
         self._v_est = gt_v0
-        self._q_est = R.from_euler('xyz', np.array([gt_r0[0], gt_r0[1], gt_r0[2]]), degrees=True).as_quat()
+        self._q_est = R.from_euler('xyz', np.array(
+            [gt_r0[0], gt_r0[1], gt_r0[2]]), degrees=True).as_quat()
         self._previous_prediction_timestamp = timestamp
 
         self._is_initialized = True
@@ -90,7 +95,8 @@ class StateEstimator():
         rotated_imu_acc = c_ns.dot(imu_f)
         acceleration = rotated_imu_acc + self._g
 
-        p_check = self._p_est + delta_t * self._v_est + ((delta_t ** 2) / 2) * acceleration
+        p_check = self._p_est + delta_t * self._v_est + \
+            ((delta_t ** 2) / 2) * acceleration
         v_check = self._v_est + delta_t * acceleration
 
         delta_angles = imu_w * delta_t
@@ -117,7 +123,8 @@ class StateEstimator():
         Correct predicted state using GNSS measurement.
         """
         if np.all(self._p_cov == 0):
-            logging.info('skipping correction - waiting for prediction step first')
+            logging.info(
+                'skipping correction - waiting for prediction step first')
             return
 
         logging.info('performing state correction')
@@ -131,7 +138,8 @@ class StateEstimator():
 
         # compute Kalman Gain
         r_cov = np.eye(3) * (sensor_var**2)
-        k_gain = p_cov_check @ h_jac.T @ np.linalg.inv(h_jac @ p_cov_check @ h_jac.T + r_cov)  # 9x3
+        k_gain = p_cov_check @ h_jac.T @ np.linalg.inv(
+            h_jac @ p_cov_check @ h_jac.T + r_cov)  # 9x3
 
         # compute error state
         delta_x = k_gain @ (y_k - p_check)  # 9x1

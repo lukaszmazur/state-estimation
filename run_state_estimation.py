@@ -14,9 +14,12 @@ from live_plotter import LivePlotterProcess
 
 def main():
 
-    arg_parser = ArgumentParser(description="State estimator demo for CARLA simulator")
-    arg_parser.add_argument('--output', type=str, default='./output', help='Specify the output path for logs and figures')
-    arg_parser.add_argument('--timeout', type=int, default=3600, help='Number of simulated seconds for which the state estimation should run')
+    arg_parser = ArgumentParser(
+        description="State estimator demo for CARLA simulator")
+    arg_parser.add_argument('--output', type=str, default='./output',
+                            help='Specify the output path for logs and figures')
+    arg_parser.add_argument('--timeout', type=int, default=3600,
+                            help='Number of simulated seconds for which the state estimation should run')
     args = arg_parser.parse_args()
     output_path = args.output
     timeout = args.timeout
@@ -72,7 +75,8 @@ def main():
         ego_bp = blueprint_library.find('vehicle.tesla.model3')
         ego_transform = random.choice(world.get_map().get_spawn_points())
         ego_vehicle = world.spawn_actor(ego_bp, ego_transform)
-        logging.info(f'created ego vehicle {ego_vehicle.type_id} with id {ego_vehicle.id}')
+        logging.info(
+            f'created ego vehicle {ego_vehicle.type_id} with id {ego_vehicle.id}')
 
         # enable autopilot for ego vehicle
         ego_vehicle.set_autopilot(True)
@@ -96,7 +100,8 @@ def main():
         imu_bp.set_attribute('sensor_tick', '0.05')
         # TODO: check relative location
         imu_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
-        imu = world.spawn_actor(imu_bp, imu_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
+        imu = world.spawn_actor(
+            imu_bp, imu_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
         logging.info('created %s' % imu.type_id)
         imu_queue = sensor_receiver.get_imu_queue()
         imu.listen(imu_queue.put)
@@ -106,7 +111,8 @@ def main():
         gnss_bp.set_attribute('sensor_tick', '0.5')
         # TODO: check relative location
         gnss_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
-        gnss = world.spawn_actor(gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
+        gnss = world.spawn_actor(
+            gnss_bp, gnss_transform, attach_to=ego_vehicle, attachment_type=carla.AttachmentType.Rigid)
         logging.info('created %s' % gnss.type_id)
         gnss_queue = sensor_receiver.get_gnss_queue()
         gnss.listen(gnss_queue.put)
@@ -114,7 +120,8 @@ def main():
         # wait a few seconds before starting state estimator (initial few sensor measurements seems to be not reliable)
         simulation_timeout_seconds = 3
         timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
-        logging.info(f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
+        logging.info(
+            f'waiting for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
         for _ in range(timeout_ticks):
             world.tick()
@@ -127,7 +134,8 @@ def main():
         # run state estimation loop
         simulation_timeout_seconds = timeout
         timeout_ticks = int(simulation_timeout_seconds / seconds_per_tick)
-        logging.info(f'running estimation for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
+        logging.info(
+            f'running estimation for {simulation_timeout_seconds} seconds ({timeout_ticks} ticks)')
 
         for _ in range(timeout_ticks):
             frame = world.tick()
@@ -144,8 +152,8 @@ def main():
 
             spectator_transform = carla.Transform(carla.Location(x=gt_data[0], y=gt_data[1], z=gt_data[2]+2.5),
                                                   carla.Rotation(roll=gt_data[3], pitch=gt_data[4]-20, yaw=gt_data[5]))
-            client.apply_batch_sync([carla.command.ApplyTransform(spectator.id, spectator_transform)])
-
+            client.apply_batch_sync(
+                [carla.command.ApplyTransform(spectator.id, spectator_transform)])
 
     finally:
         logging.info('terminating plotter')
@@ -167,6 +175,7 @@ def main():
         ego_vehicle.destroy()
 
     logging.info('='*20 + ' FINISHED ' + '='*20)
+
 
 if __name__ == '__main__':
 

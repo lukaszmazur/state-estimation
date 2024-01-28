@@ -57,7 +57,8 @@ class LivePlotter():
             logging.error('no lines to plot')
             return
 
-        self._ax.set(xlabel=self._xlabel, ylabel=self._ylabel, title=self._title)
+        self._ax.set(xlabel=self._xlabel,
+                     ylabel=self._ylabel, title=self._title)
         self._ax.legend()
         self._ax.grid(True)
 
@@ -104,7 +105,8 @@ class LivePlotterComposer():
         elif len(axes_list.shape) == 1:
             added_plotters = [LivePlotter(fig, axes) for axes in axes_list]
         else:
-            added_plotters = [[LivePlotter(fig, axes) for axes in row] for row in axes_list]
+            added_plotters = [[LivePlotter(fig, axes)
+                               for axes in row] for row in axes_list]
         self._plotters.extend(added_plotters)
         return added_plotters
 
@@ -126,7 +128,8 @@ class LivePlotterProcess():
     def __init__(self):
         self._queue = mp.Queue()
         # TODO: change start method to 'spawn'?
-        self._plot_process = mp.Process(target=self.update_plot, args=(self._queue,))
+        self._plot_process = mp.Process(
+            target=self.update_plot, args=(self._queue,))
 
     def get_queue(self):
         return self._queue
@@ -144,23 +147,34 @@ class LivePlotterProcess():
             return [plotter.add_line(label) for label in labels]
 
         labels = ('Estimated', 'Ground Truth')
-        x_est_id, x_gt_id = add_lines(plotters[0][0], 'X position', labels, ylabel='Position [m]')
-        y_est_id, y_gt_id = add_lines(plotters[0][1], 'Y position', labels, ylabel='Position [m]')
-        z_est_id, z_gt_id = add_lines(plotters[0][2], 'Z position', labels, ylabel='Position [m]')
-        vx_est_id, vx_gt_id = add_lines(plotters[1][0], 'X velocity', labels, ylabel='Velocity [m/s]')
-        vy_est_id, vy_gt_id = add_lines(plotters[1][1], 'Y velocity', labels, ylabel='Velocity [m/s]')
-        vz_est_id, vz_gt_id = add_lines(plotters[1][2], 'Z velocity', labels, ylabel='Velocity [m/s]')
-        roll_est_id, roll_gt_id = add_lines(plotters[2][0], 'Roll', labels, ylabel='Rotation [deg]', min_y_span=5)
-        pitch_est_id, pitch_gt_id = add_lines(plotters[2][1], 'Pitch', labels, ylabel='Rotation [deg]', min_y_span=5)
-        yaw_est_id, yaw_gt_id = add_lines(plotters[2][2], 'Yaw', labels, ylabel='Rotation [deg]', min_y_span=5)
+        x_est_id, x_gt_id = add_lines(
+            plotters[0][0], 'X position', labels, ylabel='Position [m]')
+        y_est_id, y_gt_id = add_lines(
+            plotters[0][1], 'Y position', labels, ylabel='Position [m]')
+        z_est_id, z_gt_id = add_lines(
+            plotters[0][2], 'Z position', labels, ylabel='Position [m]')
+        vx_est_id, vx_gt_id = add_lines(
+            plotters[1][0], 'X velocity', labels, ylabel='Velocity [m/s]')
+        vy_est_id, vy_gt_id = add_lines(
+            plotters[1][1], 'Y velocity', labels, ylabel='Velocity [m/s]')
+        vz_est_id, vz_gt_id = add_lines(
+            plotters[1][2], 'Z velocity', labels, ylabel='Velocity [m/s]')
+        roll_est_id, roll_gt_id = add_lines(
+            plotters[2][0], 'Roll', labels, ylabel='Rotation [deg]', min_y_span=5)
+        pitch_est_id, pitch_gt_id = add_lines(
+            plotters[2][1], 'Pitch', labels, ylabel='Rotation [deg]', min_y_span=5)
+        yaw_est_id, yaw_gt_id = add_lines(
+            plotters[2][2], 'Yaw', labels, ylabel='Rotation [deg]', min_y_span=5)
 
         plotter = plotter_composer.add_plotters(1, 1, figsize=(10, 10))[0]
-        xy_est_id, xy_gt_id = add_lines(plotter, 'XY position', labels, xlabel='X position [m]', ylabel='Y position[m]')
+        xy_est_id, xy_gt_id = add_lines(
+            plotter, 'XY position', labels, xlabel='X position [m]', ylabel='Y position[m]')
 
         def retrieve_data_thread(data_queue):
             while True:
                 try:
-                    data = data_queue.get(timeout=1)  # Wait for 1 second to get data from the queue
+                    # Wait for 1 second to get data from the queue
+                    data = data_queue.get(timeout=1)
                     logging.info(f'received new data: {data}')
 
                     est_t, est_x, est_y, est_z, est_vx, est_vy, est_vz, est_roll, est_pitch, est_yaw, \
@@ -193,7 +207,8 @@ class LivePlotterProcess():
                 except queue.Empty:
                     continue
 
-        data_thread = threading.Thread(target=retrieve_data_thread, args=(self._queue,))
+        data_thread = threading.Thread(
+            target=retrieve_data_thread, args=(self._queue,))
         data_thread.start()
 
         plotter_composer.draw()

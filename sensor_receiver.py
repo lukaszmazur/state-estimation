@@ -35,41 +35,49 @@ class SensorReceiver():
 
         # do not catch queue.Empty exception for Ground Truth, because it
         # must be present
-        world_snapshot = self._retrieve_data(self._gt_queue, frame, timeout=0.05)
+        world_snapshot = self._retrieve_data(
+            self._gt_queue, frame, timeout=0.05)
 
         if not world_snapshot.has_actor(self._ego_id):
             return None, None, None
         actor_snapshot = world_snapshot.find(self._ego_id)
         gt_data = (
-            actor_snapshot.get_transform().location.x, actor_snapshot.get_transform().location.y, actor_snapshot.get_transform().location.z,
-            actor_snapshot.get_transform().rotation.roll, actor_snapshot.get_transform().rotation.pitch, actor_snapshot.get_transform().rotation.yaw,
-            actor_snapshot.get_velocity().x, actor_snapshot.get_velocity().y, actor_snapshot.get_velocity().z,
-            actor_snapshot.get_angular_velocity().x, actor_snapshot.get_angular_velocity().y, actor_snapshot.get_angular_velocity().z,
-            actor_snapshot.get_acceleration().x, actor_snapshot.get_acceleration().y, actor_snapshot.get_acceleration().z,
+            actor_snapshot.get_transform().location.x, actor_snapshot.get_transform(
+            ).location.y, actor_snapshot.get_transform().location.z,
+            actor_snapshot.get_transform().rotation.roll, actor_snapshot.get_transform(
+            ).rotation.pitch, actor_snapshot.get_transform().rotation.yaw,
+            actor_snapshot.get_velocity().x, actor_snapshot.get_velocity(
+            ).y, actor_snapshot.get_velocity().z,
+            actor_snapshot.get_angular_velocity().x, actor_snapshot.get_angular_velocity(
+            ).y, actor_snapshot.get_angular_velocity().z,
+            actor_snapshot.get_acceleration().x, actor_snapshot.get_acceleration(
+            ).y, actor_snapshot.get_acceleration().z,
             world_snapshot.timestamp.elapsed_seconds)
 
         try:
-            imu_sensor_data = self._retrieve_data(self._imu_queue, frame, timeout=0.01)
+            imu_sensor_data = self._retrieve_data(
+                self._imu_queue, frame, timeout=0.01)
             imu_data = (
                 imu_sensor_data.accelerometer.x, imu_sensor_data.accelerometer.y, imu_sensor_data.accelerometer.z,
                 imu_sensor_data.gyroscope.x, imu_sensor_data.gyroscope.y, imu_sensor_data.gyroscope.z,
                 imu_sensor_data.timestamp
-                )
+            )
             logging.info(f'IMU data: {imu_data}')
         except queue.Empty:
             imu_data = None
 
         try:
-            gnss_sensor_data = self._retrieve_data(self._gnss_queue, frame, timeout=0.01)
+            gnss_sensor_data = self._retrieve_data(
+                self._gnss_queue, frame, timeout=0.01)
             location = self._geolocation_to_location(
                 carla.GeoLocation(gnss_sensor_data.latitude, gnss_sensor_data.longitude, gnss_sensor_data.altitude))
-            gnss_data = (location.x, location.y, location.z, gnss_sensor_data.timestamp)
+            gnss_data = (location.x, location.y, location.z,
+                         gnss_sensor_data.timestamp)
             logging.info(f'GNSS data: {gnss_data}')
         except queue.Empty:
             gnss_data = None
 
         return gt_data, imu_data, gnss_data
-
 
     def _retrieve_data(self, sensor_queue, current_frame, timeout=0.1):
         # retrieve data in the loop, because we want to get data corresponding
@@ -114,6 +122,7 @@ class SensorReceiver():
         """
         Transform from carla.GeoLocation to carla.Location.
         """
-        geoloc_array = np.array([geoloc.latitude, geoloc.longitude, geoloc.altitude])
+        geoloc_array = np.array(
+            [geoloc.latitude, geoloc.longitude, geoloc.altitude])
         loc_array = self._gnss_transform.dot(geoloc_array.T)
         return carla.Location(*loc_array)

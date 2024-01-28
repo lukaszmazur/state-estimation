@@ -5,6 +5,7 @@ class RingBuffer():
     """
     Base class for ring data buffers.
     """
+
     def __init__(self, element_size, buffer_size):
         self._buffer_size = buffer_size
         self._data = np.zeros((self._buffer_size, element_size))
@@ -21,6 +22,7 @@ class RingBuffer():
 
     def get_data(self):
         return self._data[:self._number_of_elements_in_buffer]
+
 
 def skew_symmetric(v):
     """
