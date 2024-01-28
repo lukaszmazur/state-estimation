@@ -3,7 +3,7 @@ import numpy as np
 
 class RingBuffer():
     """
-    Base class for ring data buffers.
+    Ring data buffer stored as an array.
     """
 
     def __init__(self, element_size, buffer_size):

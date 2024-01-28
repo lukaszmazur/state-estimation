@@ -7,6 +7,10 @@ import carla
 
 
 class SensorReceiver():
+    """
+    Class for receiving measurements from ego vehicle sensors and ground truth
+    from world snapshot. It provides thread safe queues used in sensor callbacks.
+    """
 
     def __init__(self, world_map, ego_id):
         self._gt_queue = queue.Queue()
@@ -29,8 +33,9 @@ class SensorReceiver():
         """
         Retrieves data from all sensor queues for a given frame.
 
-        Returns: a tuple (gt_data, imu_data, gnss_data)
-                 only gt_data must be present, others can be None
+        Returns:
+            tuple: A tuple (gt_data, imu_data, gnss_data).
+                   Only gt_data must be present, others can be None.
         """
 
         # do not catch queue.Empty exception for Ground Truth, because it
@@ -42,16 +47,21 @@ class SensorReceiver():
             return None, None, None
         actor_snapshot = world_snapshot.find(self._ego_id)
         gt_data = (
-            actor_snapshot.get_transform().location.x, actor_snapshot.get_transform(
-            ).location.y, actor_snapshot.get_transform().location.z,
-            actor_snapshot.get_transform().rotation.roll, actor_snapshot.get_transform(
-            ).rotation.pitch, actor_snapshot.get_transform().rotation.yaw,
-            actor_snapshot.get_velocity().x, actor_snapshot.get_velocity(
-            ).y, actor_snapshot.get_velocity().z,
-            actor_snapshot.get_angular_velocity().x, actor_snapshot.get_angular_velocity(
-            ).y, actor_snapshot.get_angular_velocity().z,
-            actor_snapshot.get_acceleration().x, actor_snapshot.get_acceleration(
-            ).y, actor_snapshot.get_acceleration().z,
+            actor_snapshot.get_transform().location.x,
+            actor_snapshot.get_transform().location.y,
+            actor_snapshot.get_transform().location.z,
+            actor_snapshot.get_transform().rotation.roll,
+            actor_snapshot.get_transform().rotation.pitch,
+            actor_snapshot.get_transform().rotation.yaw,
+            actor_snapshot.get_velocity().x,
+            actor_snapshot.get_velocity().y,
+            actor_snapshot.get_velocity().z,
+            actor_snapshot.get_angular_velocity().x,
+            actor_snapshot.get_angular_velocity().y,
+            actor_snapshot.get_angular_velocity().z,
+            actor_snapshot.get_acceleration().x,
+            actor_snapshot.get_acceleration().y,
+            actor_snapshot.get_acceleration().z,
             world_snapshot.timestamp.elapsed_seconds)
 
         try:

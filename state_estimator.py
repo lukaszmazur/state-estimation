@@ -7,7 +7,17 @@ from utils import skew_symmetric
 
 class StateEstimator():
     """
-    Error State Extended Kalman Filter (ES-EKF) Solver.
+    This class performs state estimation of ego vehicle using Error-State
+    Extended Kalman Filter (ES-EKF).
+
+    Estimation is based on IMU measurements for state prediction and GNSS
+    measurements for state correction.
+
+    NOTE: Currently measurements are assumed to be without any noise.
+          So model variances are set to an arbitrary low value.
+
+    NOTE: For faster convergence, state estimator can be initialized with
+          ground truth state, as a simplification.
     """
 
     def __init__(self):
@@ -28,9 +38,9 @@ class StateEstimator():
         self._q_var_const[3:, :] *= self._var_imu_w**2
 
         # state estimates
-        self._p_est = np.zeros(3)  # position estimates
-        self._v_est = np.zeros(3)  # velocity estimates
-        # orientation estimates as quaternions
+        self._p_est = np.zeros(3)  # position estimate
+        self._v_est = np.zeros(3)  # velocity estimate
+        # orientation estimate as quaternion
         self._q_est = R.from_euler('xyz', np.array([0., 0., 0.])).as_quat()
         self._p_cov = np.zeros((9, 9))  # covariance matrix
         self._timestamp = 0.0
@@ -123,8 +133,7 @@ class StateEstimator():
         Correct predicted state using GNSS measurement.
         """
         if np.all(self._p_cov == 0):
-            logging.info(
-                'skipping correction - waiting for prediction step first')
+            logging.info('skipping correction until first prediction step')
             return
 
         logging.info('performing state correction')

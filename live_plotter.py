@@ -11,6 +11,13 @@ from utils import RingBuffer
 
 
 class LivePlotter():
+    """
+    Class for handling plots (lines) on a single axes object that are updated
+    (drawn) on a regular interval.
+
+    Data for each line is stored in a separate ring buffer.
+    """
+
     def __init__(self, figure, axes, buffer_size=4000):
         self._title = None
         self._xlabel = None
@@ -94,6 +101,10 @@ class LivePlotter():
 
 
 class LivePlotterComposer():
+    """
+    Class for managing plotters.
+    """
+
     def __init__(self):
         self._plotters = list()
 
@@ -125,6 +136,10 @@ class LivePlotterComposer():
 
 
 class LivePlotterProcess():
+    """
+    Class for starting a separate process for plotting state estimations.
+    """
+
     def __init__(self):
         self._queue = mp.Queue()
         # TODO: change start method to 'spawn'?
