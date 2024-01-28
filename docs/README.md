@@ -62,4 +62,4 @@ General:
 
 - Design of Kalman filter is based on the assignment from ["State Estimation and Localization for Self-Driving Cars"](https://www.coursera.org/learn/state-estimation-localization-self-driving-cars?specialization=self-driving-cars).
 - Transformation of GNSS measurements from carla.GeoLocation to carla.Location is
-base on Geo2Location from [carla-semantic-localization](https://github.com/lian999111/carla-semantic-localization/blob/c4844f2f6b8bbc21c8e3e4962954cf01eb673e85/carlasim/data_collect.py).
+based on Geo2Location from [carla-semantic-localization](https://github.com/lian999111/carla-semantic-localization/blob/c4844f2f6b8bbc21c8e3e4962954cf01eb673e85/carlasim/data_collect.py).
